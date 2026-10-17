@@ -221,6 +221,10 @@ def build_phone_tab(classifier) -> None:
     name_box = gr.Textbox(label="Your name", placeholder="e.g. Alex")
     join_btn = gr.Button("Start", variant="primary")
     name_state = gr.State("")
+    # "ideal" here is just the hint for Gradio's own first getUserMedia call (which has no
+    # retry logic of its own); the exact -> ideal -> user fallback chain that actually
+    # enforces the rear camera runs client-side in _CAMERA_JS below, which takes over the
+    # stream right after Gradio attaches it.
     rear_camera = gr.WebcamOptions(constraints={"facingMode": {"ideal": "environment"}})
     cam = gr.Image(
         sources=["webcam"],
@@ -229,9 +233,11 @@ def build_phone_tab(classifier) -> None:
         label="Point at an object (live stream)",
         visible=False,
         webcam_options=rear_camera,
+        elem_id="phone-live-cam",
     )
     with gr.Row(visible=False) as flash_row:
         flash_btn = gr.Button("Flash: off", elem_id="flash-toggle-btn")
+        switch_btn = gr.Button("Switch camera", elem_id="switch-camera-btn")
         flash_status = gr.HTML(elem_id="flash-status")
     gr.Markdown(
         "If the live stream above doesn't start (common on some phone browsers "
@@ -244,6 +250,7 @@ def build_phone_tab(classifier) -> None:
         label="Or take / upload a photo",
         visible=False,
         webcam_options=rear_camera,
+        elem_id="phone-fallback-upload",
     )
     send_btn = gr.Button("Send photo", variant="primary", visible=False)
     result_out = gr.HTML()
@@ -271,6 +278,146 @@ def build_phone_tab(classifier) -> None:
         join,
         inputs=name_box,
         outputs=[name_box, name_state, cam, flash_row, upload, send_btn, result_out],
+    )
+
+    # Shared client-side camera install, idempotent (guarded by window.__rearCamSetup).
+    # Exposes window.__switchCamera() for the Switch-camera button and installs a
+    # MutationObserver on the live-stream video that corrects the camera to rear-facing
+    # the moment Gradio attaches a stream, in case the browser ignored our "ideal:
+    # environment" hint and handed us the front camera instead (requirement (a)). Both
+    # the observer's correction and the Switch button use the same exact -> ideal
+    # fallback chain, since "exact" throws OverconstrainedError on devices that don't
+    # label facingMode at all.
+    _CAMERA_INSTALL_JS = """
+    () => {
+        if (window.__rearCamSetup) {
+            // Already installed from an earlier Start click: just kick off a fresh
+            // facing-check loop in case this is a reconnect with a new stream.
+            if (window.__startFacingCheckLoop) window.__startFacingCheckLoop();
+            return;
+        }
+        window.__rearCamSetup = true;
+
+        async function tryGetStream(facing) {
+            const attempts = [
+                { video: { facingMode: { exact: facing } } },
+                { video: { facingMode: { ideal: facing } } },
+            ];
+            let lastErr;
+            for (const c of attempts) {
+                try { return await navigator.mediaDevices.getUserMedia(c); }
+                catch (e) { lastErr = e; }
+            }
+            throw lastErr;
+        }
+        window.__tryGetCameraStream = tryGetStream;
+
+        function stopVideoTracks(video) {
+            if (video && video.srcObject && video.srcObject.getTracks) {
+                video.srcObject.getTracks().forEach(t => t.stop());
+            }
+        }
+        window.__stopVideoTracks = stopVideoTracks;
+
+        window.__switchCamera = async function() {
+            const container = document.getElementById('phone-live-cam');
+            const video = container ? container.querySelector('video') : null;
+            if (!video || !video.srcObject) return;
+            const current = video.dataset.facing || 'environment';
+            const next = current === 'environment' ? 'user' : 'environment';
+            try {
+                const newStream = await tryGetStream(next);
+                stopVideoTracks(video);
+                video.srcObject = newStream;
+                video.dataset.facing = next;
+                video.dataset.userSwitch = '1'; // tells the poll loop not to force this back to rear
+                await video.play().catch(() => {});
+            } catch (e) {
+                // Switch failed (e.g. no second camera); keep the current stream running.
+            }
+        };
+
+        // Polls for a NEW stream (tracked by MediaStream identity, not DOM mutations,
+        // since assigning video.srcObject is a plain JS property write that never fires
+        // a MutationObserver) and corrects it to the rear camera once, the moment Gradio
+        // attaches it. Runs for up to ~15s after every Start click, which covers both the
+        // first connect and a reconnect after Switch/rejoin.
+        function startFacingCheckLoop() {
+            let lastStream = null;
+            let ticks = 0;
+            const maxTicks = 30; // ~15s at 500ms
+            const interval = setInterval(async () => {
+                ticks += 1;
+                if (ticks > maxTicks) { clearInterval(interval); return; }
+                const container = document.getElementById('phone-live-cam');
+                const video = container ? container.querySelector('video') : null;
+                if (!video || !video.srcObject || video.readyState < 2) return;
+                if (video.srcObject === lastStream) return;
+                lastStream = video.srcObject;
+                if (video.dataset.userSwitch === '1') {
+                    // This stream change came from the Switch-camera button, not Gradio;
+                    // respect the user's explicit choice instead of forcing it back.
+                    video.dataset.userSwitch = '';
+                    return;
+                }
+                const track = video.srcObject.getVideoTracks()[0];
+                if (!track) return;
+                const settings = track.getSettings ? track.getSettings() : {};
+                video.dataset.facing = settings.facingMode || 'environment';
+                if (settings.facingMode === 'user') {
+                    try {
+                        const rearStream = await tryGetStream('environment');
+                        stopVideoTracks(video);
+                        video.srcObject = rearStream;
+                        video.dataset.facing = 'environment';
+                        lastStream = rearStream;
+                        await video.play().catch(() => {});
+                    } catch (e) {
+                        // No rear camera available on this device; keep the front camera.
+                    }
+                }
+            }, 500);
+        }
+        window.__startFacingCheckLoop = startFacingCheckLoop;
+        startFacingCheckLoop();
+
+        // Fallback "take / upload a photo" input: force the native camera app to open
+        // on the rear camera when a phone taps it (requirement about <input capture>).
+        const fallback = document.getElementById('phone-fallback-upload');
+        const fileInput = fallback ? fallback.querySelector('input[type=file]') : null;
+        if (fileInput) {
+            fileInput.setAttribute('accept', 'image/*');
+            fileInput.setAttribute('capture', 'environment');
+        }
+    }
+    """
+
+    join_btn.click(fn=None, inputs=None, outputs=None, js=_CAMERA_INSTALL_JS)
+
+    # Stops any existing camera tracks before a reconnect (Start clicked again after a
+    # Switch, or after rejoining), so the old stream's tracks don't keep the camera busy.
+    join_btn.click(
+        fn=None,
+        inputs=None,
+        outputs=None,
+        js="""
+        () => {
+            const container = document.getElementById('phone-live-cam');
+            const video = container ? container.querySelector('video') : null;
+            if (video && window.__stopVideoTracks) { window.__stopVideoTracks(video); }
+        }
+        """,
+    )
+
+    switch_btn.click(
+        fn=None,
+        inputs=None,
+        outputs=None,
+        js="""
+        () => {
+            if (window.__switchCamera) { window.__switchCamera(); }
+        }
+        """,
     )
 
     # Toggles the rear camera's torch directly via the page's MediaStreamTrack, entirely
