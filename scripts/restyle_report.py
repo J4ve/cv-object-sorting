@@ -45,6 +45,10 @@ HEADER_FILL = "EAD1DC"
 BORDER_COLOR = "666666"
 
 H1_RE = re.compile(r"^\d+\.\s+[A-Z]")
+# A code identifier or URL this long cannot be broken across lines, and
+# justifying the line before it stretches the spaces visibly. Those paragraphs
+# are set flush left instead.
+LONG_TOKEN = re.compile(r"\S{16,}")
 H2_RE = re.compile(r"^\d+\.\d+\s+\S")
 
 # Two tables gain captions and one chart is added, so everything after them
@@ -277,8 +281,13 @@ def caption(doc, text: str, **kwargs):
     )
 
 
+def justification(text: str) -> str:
+    return "left" if LONG_TOKEN.search(text) else "both"
+
+
 def body(doc, parts, **kwargs):
-    kwargs.setdefault("align", "both")
+    joined = "".join(part[0] if isinstance(part, tuple) else part for part in parts)
+    kwargs.setdefault("align", justification(joined))
     kwargs.setdefault("after", 120)
     return make_paragraph(doc, parts, **kwargs)
 
@@ -333,6 +342,10 @@ def style_table(table, *, header=True):
             # the last row keeps with the caption that follows the table
             last_row = keep_whole or row_index == len(table.rows) - 1
             for p in cell.paragraphs:
+                nodes = [n for n in p._p.iter(qn("w:t"))]
+                if nodes:          # Google Docs left stray padding in some cells
+                    nodes[0].text = (nodes[0].text or "").lstrip()
+                    nodes[-1].text = (nodes[-1].text or "").rstrip()
                 set_ppr(p, align="left", before=20, after=20, line=240,
                         keep_next=last_row, keep_lines=True)
                 set_run_props(p, size=TABLE_SIZE, bold=True if is_header else None)
@@ -428,12 +441,12 @@ def restyle(in_path: Path, out_path: Path) -> None:
             has_num = num_pr is not None and num_pr.find(qn("w:numPr")) is not None
             if has_num:
                 num_id = num_pr.find(qn("w:numPr")).find(qn("w:numId")).get(qn("w:val"))
-                set_ppr(p, align="both", before=0, after=60, line=240,
+                set_ppr(p, align=justification(text), before=0, after=60, line=240,
                         left=720, hanging=360, num_id=num_id)
             elif p._p.findall(".//" + qn("w:drawing")):
                 set_ppr(p, align="center", before=120, after=60, line=240, keep_next=True)
             else:
-                set_ppr(p, align="both", before=0, after=140, line=240)
+                set_ppr(p, align=justification(text), before=0, after=140, line=240)
             set_run_props(p, size=BODY_SIZE)
 
     # -- 3. renumber the in-text table and figure references ---------------
@@ -589,8 +602,8 @@ def restyle(in_path: Path, out_path: Path) -> None:
             num_pr = ppr.find(qn("w:numPr")) if ppr is not None else None
             if num_pr is None:
                 break
-            set_ppr(p, align="both", before=0, after=60, line=240,
-                    left=720, hanging=360, num_id=num_ids["objectives"])
+            set_ppr(p, align=justification(paragraph_text(p)), before=0, after=60,
+                    line=240, left=720, hanging=360, num_id=num_ids["objectives"])
             set_run_props(p, size=BODY_SIZE)
             node = node.getnext()
 
@@ -606,8 +619,8 @@ def restyle(in_path: Path, out_path: Path) -> None:
                 or first.find(qn("w:tab")) is None):
             continue
         p._p.remove(first)
-        set_ppr(p, align="both", before=0, after=60, line=240,
-                left=720, hanging=360, num_id=num_ids["workflow"])
+        set_ppr(p, align=justification(paragraph_text(p)), before=0, after=60,
+                line=240, left=720, hanging=360, num_id=num_ids["workflow"])
         set_run_props(p, size=BODY_SIZE)
 
     # 3.6 becomes numbered steps with a bold step name, like Section 2.2
@@ -635,7 +648,8 @@ def restyle(in_path: Path, out_path: Path) -> None:
         new_steps = []
         for label, rest in steps:
             step = make_paragraph(doc, [(label, True, False), (rest, False, False)],
-                                  align="both", before=0, after=60, line=240,
+                                  align=justification(label + rest),
+                                  before=0, after=60, line=240,
                                   left=720, hanging=360, num_id=num_ids["preprocessing"])
             set_run_props(step, size=BODY_SIZE)
             for run in step._p.iter(qn("w:r")):
