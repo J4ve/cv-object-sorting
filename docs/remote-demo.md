@@ -13,7 +13,7 @@ device dropdown in the app's **Presenter** tab (see
 live, on screen, for everyone on the call.
 
 This is a description of how that one session was run, not a plan for
-permanent infrastructure — there's no dedicated hardware or server for
+permanent infrastructure: there's no dedicated hardware or server for
 this project; it borrowed a VPS someone already had running for something
 else, for the duration of the demo.
 
@@ -28,14 +28,14 @@ silently denied. So the Gradio app's local URL had to be reachable over
 ## How it worked: a reverse SSH tunnel through a cloud VPS
 
 The presenter's Gradio app only listens on `127.0.0.1:7860` on their own
-laptop — it was never exposed directly to the internet. Instead:
+laptop; it was never exposed directly to the internet. Instead:
 
 <p align="center"><img src="images/remote-demo-flow.svg" width="650" alt="Groupmate's phone connects over HTTPS to Caddy on the VPS, which is linked by a reverse SSH tunnel to the Gradio app on the presenter's laptop"><br><sub>Figure 1. A phone's HTTPS request reaches Caddy on the VPS, which hands off through the reverse SSH tunnel to the Gradio app on the presenter's own laptop.</sub></p>
 
 1. **A small cloud VPS** (`<vps-ip>`) already ran [Caddy](https://caddyserver.com/)
    as its web server/reverse proxy for other things.
 2. We gave the VPS a hostname via **sslip.io**, a free DNS service that
-   maps `<ip-with-dashes>.sslip.io` to that IP automatically — no DNS
+   maps `<ip-with-dashes>.sslip.io` to that IP automatically. No DNS
    registrar or manual records needed. Caddy requests a Let's Encrypt
    certificate for that hostname **on demand**, the first time it's
    visited, which is what makes it serve valid HTTPS with zero manual
@@ -59,7 +59,7 @@ laptop — it was never exposed directly to the internet. Instead:
        <user>@<vps-ip>
    ```
    The forwarded port was bound to `127.0.0.1` **on the VPS**, not
-   `0.0.0.0` — so it was only reachable through Caddy's HTTPS front door,
+   `0.0.0.0`, so it was only reachable through Caddy's HTTPS front door,
    never directly.
 5. While that SSH session stayed open, `https://demo.<ip-with-dashes>.sslip.io`
    resolved to the laptop's Gradio app, with a valid HTTPS certificate, from
@@ -67,7 +67,7 @@ laptop — it was never exposed directly to the internet. Instead:
    phones; the presenter picked each phone from the camera dropdown in the
    Gradio UI and showed it live on the shared screen.
 6. As soon as the SSH session was closed, the tunnel disappeared and the
-   URL stopped resolving to anything — nothing was left running after the
+   URL stopped resolving to anything. Nothing was left running after the
    demo.
 
 A short wrapper script kept the `ssh` command above alive and reconnected
@@ -100,7 +100,7 @@ stays responsive instead of building up a backlog under load.
 ## Security notes
 
 - While the tunnel was open, the URL was reachable by **anyone on the
-  internet** who had the link — there was no authentication in front of
+  internet** who had the link; there was no authentication in front of
   it. It was shared only in the Google Meet chat for the session, not
   posted anywhere more permanent.
 - The VPS only exposed one new hostname/port for this; nothing else on
@@ -139,12 +139,12 @@ does not handle by itself:
 ## Troubleshooting notes (for next time)
 
 - **502 Bad Gateway** from the hostname means Caddy can reach the VPS but
-  nothing is listening on the forwarded port there — the SSH tunnel isn't
+  nothing is listening on the forwarded port there: the SSH tunnel isn't
   up, or the local Gradio app isn't running on `127.0.0.1:7860`. Start the
   Gradio app first, then the tunnel.
 - **Certificate warnings** usually mean the hostname was just visited for
-  the first time and Caddy is still obtaining the certificate — wait a few
-  seconds and reload.
+  the first time and Caddy is still obtaining the certificate (wait a few
+  seconds and reload).
 - **Tunnel drops mid-call**: the reconnect loop/keepalives should recover
   it within a few seconds; if not, check the presenter's own network
   connection.
