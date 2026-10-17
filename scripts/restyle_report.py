@@ -59,7 +59,7 @@ H2_RE = re.compile(r"^\d+\.\d+\s+\S")
 # Two tables gain captions and one chart is added, so everything after them
 # shifts. Applied as a single simultaneous mapping, never chained.
 TABLE_MAP = {2: 4, 3: 5, 4: 6, 5: 7, 6: 8, 7: 9}
-FIGURE_MAP = {2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9, 9: 10, 10: 11}
+FIGURE_MAP = {2: 3, 3: 4, 4: 6, 5: 7, 6: 8, 7: 9, 8: 10, 9: 11, 10: 12}
 
 # The largest (width, height) in inches each figure may take, by figure number.
 # A figure that claims most of a page cannot share it with the text around it,
@@ -68,16 +68,21 @@ FIGURE_MAP = {2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9, 9: 10, 10: 11}
 # unlisted figures are wide and short already, so they fill the text width.
 FIGURE_SIZES = {
     1: (6.0, 3.5),    # architecture diagram
-    2: (5.6, 3.3),    # dataset distribution chart
-    3: (4.9, 4.2),    # class sample grid
-    6: (4.7, 4.4),    # ROC curves
-    7: (3.0, 3.0),    # threshold sweep, placed beside Figure 8
-    8: (3.0, 3.0),    # threshold selection
-    10: (4.4, 3.8),   # TrashNet confusion matrix
-    13: (4.4, 3.8),   # the same matrix, repeated in Appendix C
-    14: (5.6, 3.2),   # presenter view of the demonstration program
-    15: (5.2, 2.1),   # the Uncertain result
-    16: (6.0, 3.5),   # the architecture diagram, repeated in Appendix E
+    2: (4.4, 2.5),    # dataset distribution chart
+    3: (3.4, 2.9),    # class sample grid
+    5: (6.3, 2.2),    # training curves
+    6: (5.9, 2.4),    # test-set confusion matrix
+    7: (4.5, 4.2),    # ROC curves
+    8: (3.0, 3.0),    # threshold sweep, placed beside Figure 9
+    9: (3.0, 3.0),    # threshold selection
+    10: (5.9, 2.6),   # reliability diagram
+    11: (4.0, 3.4),   # TrashNet confusion matrix
+    12: (5.2, 2.3),    # misclassified test images
+    13: (5.7, 2.3),   # the test-set matrix, repeated in Appendix B
+    14: (3.8, 3.2),   # the TrashNet matrix, repeated in Appendix C
+    15: (4.6, 2.4),   # presenter view of the demonstration program
+    16: (5.2, 2.1),   # the Uncertain result
+    17: (6.0, 3.5),   # the architecture diagram, repeated in Appendix E
 }
 DEFAULT_FIGURE_SIZE = (6.5, 7.1)
 
@@ -184,28 +189,54 @@ def text_nodes(p):
     return [t for t in p._p.iter(qn("w:t"))]
 
 
-def replace_same_length(p, pattern: re.Pattern, repl) -> bool:
-    """Character-level substitution across fragmented runs.
+def replace_in_text(p, pattern: re.Pattern, repl) -> bool:
+    """Substitution across fragmented runs that never moves formatting.
 
-    Only used for replacements that keep the string length, so the characters
-    can be written straight back into the same positions and no run, hyperlink
-    or formatting boundary moves.
+    A match that sits inside one w:t node is patched there, which leaves every
+    run, hyperlink and formatting boundary exactly where it is even when the
+    replacement is longer (``Figure 8`` becoming ``Figure 10``). A match split
+    across nodes can only be written back character by character, so it is
+    allowed only when the length does not change.
     """
     nodes = text_nodes(p)
     if not nodes:
         return False
     joined = "".join(n.text or "" for n in nodes)
-    new = pattern.sub(repl, joined)
-    if new == joined:
+    if not pattern.search(joined):
         return False
-    if len(new) != len(joined):
-        raise ValueError(f"length changed: {joined[:60]!r}")
-    pos = 0
+    bounds, pos = [], 0
     for node in nodes:
-        n = len(node.text or "")
-        node.text = new[pos : pos + n]
-        pos += n
-    return True
+        length = len(node.text or "")
+        bounds.append((pos, pos + length))
+        pos += length
+
+    changed = False
+    split = False
+    # right to left, so the offsets of the matches still to come stay valid
+    for match in reversed(list(pattern.finditer(joined))):
+        index = next((i for i, (start, end) in enumerate(bounds)
+                      if start <= match.start() and match.end() <= end), None)
+        if index is None:
+            split = True
+            continue
+        node, offset = nodes[index], bounds[index][0]
+        text = node.text or ""
+        node.text = (text[: match.start() - offset] + repl(match)
+                     + text[match.end() - offset :])
+        changed = True
+
+    if split:
+        joined = "".join(n.text or "" for n in nodes)
+        new = pattern.sub(repl, joined)
+        if len(new) != len(joined):
+            raise ValueError(f"length changed across runs: {joined[:60]!r}")
+        pos = 0
+        for node in nodes:
+            length = len(node.text or "")
+            node.text = new[pos : pos + length]
+            pos += length
+        changed = True
+    return changed
 
 
 def paragraph_text(p) -> str:
@@ -346,9 +377,11 @@ def style_table(table, *, header=True):
         margins.append(el(f"w:{side}", w=value, type="dxa"))
     tbl_pr.append(margins)
 
-    # a short table stays whole, with its caption; a long one may break, but
-    # its header repeats and its last row still travels with the caption
-    keep_whole = len(table.rows) <= 10
+    # a short table stays whole, with its caption; a longer one may break, but
+    # its header repeats and its last row still travels with the caption. Six
+    # rows is about a third of a page: beyond that, holding the table together
+    # costs more white space at the foot of a page than the break costs.
+    keep_whole = len(table.rows) <= 6
     for row_index, row in enumerate(table.rows):
         tr_pr = row._tr.get_or_add_trPr()
         for node in tr_pr.findall(qn("w:trHeight")):
@@ -502,15 +535,15 @@ def restyle(in_path: Path, out_path: Path) -> None:
         text = paragraph_text(p)
         if re.match(r"^\s*(Table|Figure) \d+\.", text):
             continue  # captions are rewritten below, not patched
-        replace_same_length(p, table_ref,
+        replace_in_text(p, table_ref,
                             lambda m: f"Table {TABLE_MAP.get(int(m.group(1)), int(m.group(1)))}")
-        replace_same_length(p, figure_ref,
+        replace_in_text(p, figure_ref,
                             lambda m: f"Figure {FIGURE_MAP.get(int(m.group(1)), int(m.group(1)))}")
     for table in tables:
         for row in table.rows:
             for cell in row.cells:
                 for p in cell.paragraphs:
-                    replace_same_length(p, table_ref,
+                    replace_in_text(p, table_ref,
                                         lambda m: f"Table {TABLE_MAP.get(int(m.group(1)), int(m.group(1)))}")
 
     # -- 4. rewrite the captions with their new numbers --------------------
@@ -606,6 +639,40 @@ def restyle(in_path: Path, out_path: Path) -> None:
             "about 2.2 times fewer. The stratified split keeps that same proportion inside "
             "each of the three sets, so the imbalance is spread evenly across training, "
             "validation and testing rather than concentrated in one of them."
+        ])
+        insert_after(anchor._p, pic, cap, note)
+
+    # -- 7b. the training curves, from the group's Colab run ---------------
+    # The PNG is the output of the training-curves cell of the group's original
+    # Colab notebook, decoded as it was saved there. That run and the run the
+    # report measures used the same pipeline and settings, which is what the
+    # caption says; no number from the Colab run is quoted anywhere else.
+    curves_png = ROOT / "results" / "training_curves_colab_run.png"
+    curves_caption = (
+        "Figure 5. Training and validation accuracy (left) and loss (right) per epoch for "
+        "both training stages, from the group's Colab run of the same pipeline and settings "
+        "(that run reached 88.15% test accuracy; the final reported model, 87.93%, was "
+        "trained identically)."
+    )
+    anchor = find_paragraph(
+        paragraphs, lambda t: t.startswith("EarlyStopping (patience 4")
+    )
+    if anchor is not None and curves_png.exists() and curves_caption not in {
+        paragraph_text(p).strip() for p in paragraphs
+    }:
+        max_w, max_h = FIGURE_SIZES[5]
+        pic = Paragraph(el("w:p"), doc)
+        pic.add_run().add_picture(str(curves_png), width=Emu(int(max_w * 914400)))
+        set_ppr(pic, align="center", before=120, after=60, keep_next=True)
+        cap = caption(doc, curves_caption)
+        note = body(doc, [
+            "Validation accuracy leads training accuracy through the first stage, where "
+            "dropout and the augmentation layers are active on the training batches only. "
+            "After the first 12 epochs, where fine-tuning starts (the dashed line), the "
+            "training curve overtakes it: validation accuracy peaks late in the run at "
+            "about 0.85 while validation loss flattens near 0.38 and training loss keeps "
+            "falling, the mild overfitting that EarlyStopping with restore_best_weights is "
+            "there to catch."
         ])
         insert_after(anchor._p, pic, cap, note)
 
@@ -732,13 +799,13 @@ def restyle(in_path: Path, out_path: Path) -> None:
             if cell.text.strip() == "Accuracy (correct/20)":
                 set_text(cell.paragraphs[0], [("Accuracy (correct / 100)", True, False)])
 
-    # Section 6.4 claimed no misclassified examples were available; Figure 11 shows ten.
+    # Section 6.4 claimed no misclassified examples were available; Figure 12 shows ten.
     stale = find_paragraph(all_paragraphs(), lambda t: "only aggregate counts were available" in t)
     if stale is not None:
         text = paragraph_text(stale)
         keep = text.split("Individual misclassified example images")[0].rstrip()
         set_text(stale, [
-            keep + " Ten of those misclassified images are shown in Figure 11 "
+            keep + " Ten of those misclassified images are shown in Figure 12 "
             "(Section 7.3), each captioned with its true class, the predicted class, and "
             "the confidence of the wrong prediction. Screenshots of the demonstration "
             "program's recognition output are in Appendix D."
@@ -750,16 +817,16 @@ def restyle(in_path: Path, out_path: Path) -> None:
         text = paragraph_text(p)
         m = re.match(r"^((?:Training|Validation|Testing) set \([\d,]+ images\)\. )([a-z])", text)
         if m:
-            replace_same_length(p, re.compile(re.escape(m.group(0))),
+            replace_in_text(p, re.compile(re.escape(m.group(0))),
                                 lambda mm: m.group(1) + m.group(2).upper())
 
     # -- 10. move each figure's explanation below its caption ---------------
     moves = [
-        ("ROC AUC (Figure 6) summarizes", "Figure 6."),
-        ("Figure 7 shows the validation data behind", "Figure 7."),
-        ("The global fallback threshold (0.59) was selected this way", "Figure 8."),
-        ("Expected Calibration Error on the test set", "Figure 9."),
-        ("Figure 11 shows ten misclassified test images", "Figure 11."),
+        ("ROC AUC (Figure 7) summarizes", "Figure 7."),
+        ("Figure 8 shows the validation data behind", "Figure 8."),
+        ("The global fallback threshold (0.59) was selected this way", "Figure 9."),
+        ("Expected Calibration Error on the test set", "Figure 10."),
+        ("Figure 12 shows ten misclassified test images", "Figure 12."),
     ]
     for lead, cap_prefix in moves:
         src = find_paragraph(all_paragraphs(), lambda t, l=lead: t.strip().startswith(l))
@@ -837,11 +904,11 @@ def restyle(in_path: Path, out_path: Path) -> None:
     # -- 13. appendix pointers in the body ----------------------------------
     pointers = [
         ("The live demonstration extends Part A with remote camera input",
-         " Figure 1 is repeated on a page of its own in Appendix E."),
+         " Figure 1 is repeated in Appendix E."),
         ("Most common mistakes (true class misread as predicted class",
-         " This confusion matrix is repeated on a page of its own in Appendix B."),
+         " This confusion matrix is repeated in Appendix B."),
         ("The drop from 87.93% to 56.00% is domain shift",
-         " This confusion matrix is repeated on a page of its own in Appendix C."),
+         " This confusion matrix is repeated in Appendix C."),
     ]
     for prefix, extra in pointers:
         p = find_paragraph(all_paragraphs(), lambda t, pre=prefix: t.strip().startswith(pre))
@@ -1000,7 +1067,7 @@ def restyle(in_path: Path, out_path: Path) -> None:
         impl._p.append(hyperlink_el(colab, [("Google Colab copy", False)]))
         impl._p.append(plain_run(". Both links are repeated in Appendix F.", False))
 
-    # -- 17b. Figures 7 and 8 side by side ---------------------------------
+    # -- 17b. Figures 8 and 9 side by side ---------------------------------
     # Both are validation threshold charts of the same shape and are read as a
     # pair, so a borderless two-column table puts them on one line of the page
     # instead of filling two. Their explanations follow, in the same order.
@@ -1019,8 +1086,8 @@ def restyle(in_path: Path, out_path: Path) -> None:
             node = node.getprevious()
         return None, cap
 
-    pic7, cap7 = figure_block("Figure 7.")
-    pic8, cap8 = figure_block("Figure 8.")
+    pic7, cap7 = figure_block("Figure 8.")
+    pic8, cap8 = figure_block("Figure 9.")
     if all(part is not None for part in (pic7, cap7, pic8, cap8)):
         pair = doc.add_table(rows=2, cols=2)
         layout_tables.add(pair._tbl)
@@ -1098,9 +1165,18 @@ def restyle(in_path: Path, out_path: Path) -> None:
         emit(p._p)
         return p
 
-    def appendix_figure(image_path: Path):
+    def appendix_figure(image_path: Path, number: int):
+        # the appendices are built after the scaling pass above, so they size
+        # their own figures from the same table
+        from PIL import Image
+
+        with Image.open(image_path) as img:
+            aspect = img.width / img.height
+        max_w, max_h = FIGURE_SIZES.get(number, DEFAULT_FIGURE_SIZE)
         p = Paragraph(el("w:p"), doc)
-        p.add_run().add_picture(str(image_path), width=TEXT_WIDTH_EMU)
+        p.add_run().add_picture(
+            str(image_path), width=Emu(int(min(max_w, max_h * aspect) * 914400))
+        )
         set_ppr(p, align="center", before=120, after=60, keep_next=True)
         emit(p._p)
         return p
@@ -1140,7 +1216,7 @@ def restyle(in_path: Path, out_path: Path) -> None:
             ])
         appendix_table(rows)
         appendix_caption("Table 10. Confidence threshold sweep on the 464-image validation "
-                         "set, the data plotted in Figure 7.")
+                         "set, the data plotted in Figure 8.")
         appendix_body(
             "Raising the threshold buys accuracy with coverage. At 0.40 the classifier "
             "answers for almost every image but is right on 86.40% of them; at 0.90 it "
@@ -1176,9 +1252,9 @@ def restyle(in_path: Path, out_path: Path) -> None:
 
         # Appendix B ---------------------------------------------------------
         appendix_heading("Appendix B. Confusion matrix on the RealWaste test set")
-        appendix_figure(ROOT / "results" / "confusion_matrix.png")
-        appendix_caption("Figure 12. The confusion matrix on the 464-image test set, repeated "
-                         "from Figure 5 (counts, left; row-normalized, right).")
+        appendix_figure(ROOT / "results" / "confusion_matrix.png", 13)
+        appendix_caption("Figure 13. The confusion matrix on the 464-image test set, repeated "
+                         "from Figure 6 (counts, left; row-normalized, right).")
         appendix_body(
             "The diagonal holds the correct predictions. The off-diagonal cells show that "
             "the mistakes cluster on visually similar materials rather than spreading "
@@ -1188,9 +1264,9 @@ def restyle(in_path: Path, out_path: Path) -> None:
 
         # Appendix C ---------------------------------------------------------
         appendix_heading("Appendix C. Confusion matrix on the unseen TrashNet test set")
-        appendix_figure(ROOT / "results" / "unseen_trashnet_confusion_matrix.png")
-        appendix_caption("Figure 13. The confusion matrix on the 500-image unseen TrashNet "
-                         "test set, repeated from Figure 10.")
+        appendix_figure(ROOT / "results" / "unseen_trashnet_confusion_matrix.png", 14)
+        appendix_caption("Figure 14. The confusion matrix on the 500-image unseen TrashNet "
+                         "test set, repeated from Figure 11.")
         appendix_body(
             "The error pattern is different from the one in Appendix B. On images from "
             "outside RealWaste the model falls back on Cardboard for every other class, "
@@ -1199,8 +1275,8 @@ def restyle(in_path: Path, out_path: Path) -> None:
 
         # Appendix D ---------------------------------------------------------
         appendix_heading("Appendix D. Recognition output of the demonstration program")
-        appendix_figure(ROOT / "docs" / "images" / "demo-presenter-grid.png")
-        appendix_caption("Figure 14. Presenter view of the demonstration program, "
+        appendix_figure(ROOT / "docs" / "images" / "demo-presenter-grid.png", 15)
+        appendix_caption("Figure 15. Presenter view of the demonstration program, "
                          "captured during a user-interface check with three devices "
                          "connected.")
         appendix_body(
@@ -1209,8 +1285,8 @@ def restyle(in_path: Path, out_path: Path) -> None:
             "and Metal 99.7%. This is a capture of the interface described in Sections 5.2 "
             "and 5.3, not a record of the Midterm demonstration itself."
         )
-        appendix_figure(ROOT / "docs" / "images" / "demo-uncertain.png")
-        appendix_caption("Figure 15. The reject option: a prediction below its threshold "
+        appendix_figure(ROOT / "docs" / "images" / "demo-uncertain.png", 16)
+        appendix_caption("Figure 16. The reject option: a prediction below its threshold "
                          "is reported as Uncertain together with the best guess.")
         appendix_body(
             "Rather than forcing a label, the program names the best guess and the "
@@ -1221,8 +1297,8 @@ def restyle(in_path: Path, out_path: Path) -> None:
 
         # Appendix E ---------------------------------------------------------
         appendix_heading("Appendix E. System architecture diagram")
-        appendix_figure(ROOT / "docs" / "images" / "system-architecture.png")
-        appendix_caption("Figure 16. The system architecture, repeated from Figure 1: the "
+        appendix_figure(ROOT / "docs" / "images" / "system-architecture.png", 17)
+        appendix_caption("Figure 17. The system architecture, repeated from Figure 1: the "
                          "recognition pipeline, the live demonstration path, and the "
                          "offline training pipeline.")
         appendix_body(
@@ -1256,7 +1332,7 @@ def restyle(in_path: Path, out_path: Path) -> None:
         )
 
     # -- 19. every table gets the same compact look ------------------------
-    # except the invisible one holding Figures 7 and 8, which is scaffolding
+    # except the invisible one holding Figures 8 and 9, which is scaffolding
     for tbl_el in body_el.findall(qn("w:tbl")):
         if tbl_el in layout_tables:
             continue
