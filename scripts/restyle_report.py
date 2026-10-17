@@ -68,7 +68,7 @@ FIGURE_MAP = {2: 3, 3: 4, 4: 6, 5: 7, 6: 8, 7: 9, 8: 10, 9: 11, 10: 12}
 # unlisted figures are wide and short already, so they fill the text width.
 FIGURE_SIZES = {
     1: (6.0, 3.5),    # architecture diagram
-    2: (4.4, 2.5),    # dataset distribution chart
+    2: (6.5, 3.8),    # dataset distribution chart
     3: (3.4, 2.9),    # class sample grid
     5: (6.3, 2.2),    # training curves
     6: (6.5, 2.6),    # test-set confusion matrix
@@ -400,8 +400,11 @@ def style_table(table, *, header=True):
             for node in tc_pr.findall(qn("w:vAlign")):
                 tc_pr.remove(node)
             tc_pr.append(el("w:vAlign", val="center"))
-            # the last row keeps with the caption that follows the table
-            last_row = keep_whole or row_index == len(table.rows) - 1
+            # the last row keeps with the caption; in a table that may break,
+            # the header and the row after it keep with the row below so the
+            # table never leaves a header and one row at the foot of a page
+            last_row = (keep_whole or row_index == len(table.rows) - 1
+                        or row_index in (0, 1))
             for p in cell.paragraphs:
                 nodes = [n for n in p._p.iter(qn("w:t"))]
                 if nodes:          # Google Docs left stray padding in some cells
@@ -646,7 +649,10 @@ def restyle(in_path: Path, out_path: Path) -> None:
     # The PNG is the output of the training-curves cell of the group's original
     # Colab notebook, decoded as it was saved there. That run and the run the
     # report measures used the same pipeline and settings, which is what the
-    # caption says; no number from the Colab run is quoted anywhere else.
+    # caption says. The two values the note reads off the curves are that run's
+    # own logged validation figures (peak val_accuracy 0.8534 and val_loss
+    # 0.3768, both at the eighth fine-tuning epoch); every number elsewhere in
+    # the report belongs to the run that produced the demonstrated model.
     curves_png = ROOT / "results" / "training_curves_colab_run.png"
     curves_caption = (
         "Figure 5. Training and validation accuracy (left) and loss (right) per epoch for "
@@ -666,13 +672,13 @@ def restyle(in_path: Path, out_path: Path) -> None:
         set_ppr(pic, align="center", before=120, after=60, keep_next=True)
         cap = caption(doc, curves_caption)
         note = body(doc, [
-            "Validation accuracy leads training accuracy through the first stage, where "
-            "dropout and the augmentation layers are active on the training batches only. "
-            "After the first 12 epochs, where fine-tuning starts (the dashed line), the "
-            "training curve overtakes it: validation accuracy peaks late in the run at "
-            "about 0.85 while validation loss flattens near 0.38 and training loss keeps "
-            "falling, the mild overfitting that EarlyStopping with restore_best_weights is "
-            "there to catch."
+            "Validation accuracy leads training accuracy through the 12 head epochs, "
+            "where dropout and the augmentation layers are active on the training batches "
+            "only; the training curve overtakes it once fine-tuning starts (the dashed "
+            "line), and validation accuracy peaks at about 0.85 on the eighth of the ten "
+            "fine-tuning epochs while validation loss settles near 0.38 and training loss "
+            "keeps falling, the mild overfitting that EarlyStopping with "
+            "restore_best_weights is there to catch."
         ])
         insert_after(anchor._p, pic, cap, note)
 

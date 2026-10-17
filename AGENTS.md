@@ -64,8 +64,8 @@ or parentheses instead. US English spelling.
   `results/training_curves_colab_run.png` is the image output of the training-curves cell
   of the group's original Colab notebook, decoded unaltered; only the architecture block
   diagram is drawn outside a notebook, by `docs/images/make_architecture_figure.py`.
-- Page fill is a graded criterion: the reference reports fill every page to 80 to 95%, with
-  only the last page partial. The script keeps a page break after the cover and before
+- Page fill is a captain requirement, measured against the two reference reports: they
+  fill every page to 80 to 95%, with only the last page partial. The script keeps a page break after the cover and before
   REFERENCES and nowhere else, caps each figure in `FIGURE_SIZES`, sets body text to 1.15
   line spacing, keeps figure-to-caption but not caption-to-explanation, and lets a table
   over six rows break with its header repeated. Changing a figure's size moves every page
