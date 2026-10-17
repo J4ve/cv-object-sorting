@@ -729,9 +729,8 @@ def restyle(in_path: Path, out_path: Path) -> None:
          "there, including the per-class threshold that decides between a class label "
          "and \u201cUncertain\u201d. The phone and the relay below it only move the picture."),
         ("Table 9.",
-         "Cardboard is the only class the model still gets right most of the time on "
-         "these images, at 78%, while Paper falls to 37% and Plastic to 39%. The "
-         "confusion matrix below shows where those errors go."),
+         "Cardboard holds up best on these images at 78%, while Paper falls to 37% "
+         "and Plastic to 39%."),
         ("Table 1.",
          "The subset is uneven: Plastic contributes 921 images and Glass 420. The "
          "stratified split keeps each class in the same proportion inside the training, "
