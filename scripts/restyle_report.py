@@ -211,12 +211,15 @@ def insert_after(ref_el, *new_paragraphs):
 # ---------------------------------------------------------------------------
 
 
-def ensure_decimal_numbering(doc) -> str:
-    """Add a decimal list definition to numbering.xml and return its numId."""
+# One decimal list definition, instantiated once per list so each restarts at 1.
+NUM_IDS = {"objectives": "90", "workflow": "91", "preprocessing": "92"}
+
+
+def ensure_decimal_numbering(doc) -> dict:
+    """Add a decimal list definition to numbering.xml; one numId per list."""
     numbering = doc.part.numbering_part.element
-    for num in numbering.findall(qn("w:num")):
-        if num.get(qn("w:numId")) == "90":
-            return "90"
+    if any(num.get(qn("w:numId")) == "90" for num in numbering.findall(qn("w:num"))):
+        return NUM_IDS
 
     abstract = el("w:abstractNum", abstractNumId="90")
     abstract.append(el("w:multiLevelType", val="multilevel"))
@@ -227,7 +230,7 @@ def ensure_decimal_numbering(doc) -> str:
         lvl.append(el("w:lvlText", val="%%%d." % (level + 1)))
         lvl.append(el("w:lvlJc", val="left"))
         ppr = el("w:pPr")
-        ppr.append(el("w:ind", left=720 + level * 720, hanging=540))
+        ppr.append(el("w:ind", left=720 + level * 720, hanging=360))
         lvl.append(ppr)
         abstract.append(lvl)
 
@@ -238,10 +241,14 @@ def ensure_decimal_numbering(doc) -> str:
     else:
         numbering.append(abstract)
 
-    num = el("w:num", numId="90")
-    num.append(el("w:abstractNumId", val="90"))
-    numbering.append(num)
-    return "90"
+    for num_id in NUM_IDS.values():
+        num = el("w:num", numId=num_id)
+        num.append(el("w:abstractNumId", val="90"))
+        override = el("w:lvlOverride", ilvl=0)
+        override.append(el("w:startOverride", val=1))
+        num.append(override)
+        numbering.append(num)
+    return NUM_IDS
 
 
 def add_picture_paragraph(doc, image_path: Path, width_emu: int, *, after_el=None):
@@ -302,6 +309,9 @@ def style_table(table, *, header=True):
         margins.append(el(f"w:{side}", w=value, type="dxa"))
     tbl_pr.append(margins)
 
+    # a short table stays whole, with its caption; a long one may break, but
+    # its header repeats and its last row still travels with the caption
+    keep_whole = len(table.rows) <= 10
     for row_index, row in enumerate(table.rows):
         tr_pr = row._tr.get_or_add_trPr()
         for node in tr_pr.findall(qn("w:trHeight")):
@@ -321,7 +331,7 @@ def style_table(table, *, header=True):
                 tc_pr.remove(node)
             tc_pr.append(el("w:vAlign", val="center"))
             # the last row keeps with the caption that follows the table
-            last_row = row_index == len(table.rows) - 1
+            last_row = keep_whole or row_index == len(table.rows) - 1
             for p in cell.paragraphs:
                 set_ppr(p, align="left", before=20, after=20, line=240,
                         keep_next=last_row, keep_lines=True)
@@ -342,7 +352,7 @@ def find_paragraph(paragraphs, predicate):
 
 def restyle(in_path: Path, out_path: Path) -> None:
     doc = Document(str(in_path))
-    decimal_num = ensure_decimal_numbering(doc)
+    num_ids = ensure_decimal_numbering(doc)
 
     from docx.table import Table
     from docx.text.paragraph import Paragraph
@@ -580,9 +590,25 @@ def restyle(in_path: Path, out_path: Path) -> None:
             if num_pr is None:
                 break
             set_ppr(p, align="both", before=0, after=60, line=240,
-                    left=720, hanging=540, num_id=decimal_num)
+                    left=720, hanging=360, num_id=num_ids["objectives"])
             set_run_props(p, size=BODY_SIZE)
             node = node.getnext()
+
+    # Section 2.2 typed its numbers as text; make it a real numbered list
+    for p in [Paragraph(c, doc) for c in body_el.iterchildren() if c.tag == qn("w:p")]:
+        runs = p._p.findall(qn("w:r"))
+        if not runs:
+            continue
+        first = runs[0]
+        texts = first.findall(qn("w:t"))
+        # the number was typed as its own run, "2." followed by a tab
+        if (len(texts) != 1 or not re.fullmatch(r"\d+\.", (texts[0].text or "").strip())
+                or first.find(qn("w:tab")) is None):
+            continue
+        p._p.remove(first)
+        set_ppr(p, align="both", before=0, after=60, line=240,
+                left=720, hanging=360, num_id=num_ids["workflow"])
+        set_run_props(p, size=BODY_SIZE)
 
     # 3.6 becomes numbered steps with a bold step name, like Section 2.2
     prep = find_paragraph(
@@ -610,7 +636,7 @@ def restyle(in_path: Path, out_path: Path) -> None:
         for label, rest in steps:
             step = make_paragraph(doc, [(label, True, False), (rest, False, False)],
                                   align="both", before=0, after=60, line=240,
-                                  left=720, hanging=540, num_id=decimal_num)
+                                  left=720, hanging=360, num_id=num_ids["preprocessing"])
             set_run_props(step, size=BODY_SIZE)
             for run in step._p.iter(qn("w:r")):
                 pass
