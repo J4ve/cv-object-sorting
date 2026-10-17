@@ -33,7 +33,7 @@ from src.vision.classifier import CONF_THRESH, WasteClassifier  # noqa: E402
 from src.vision.remote import build_phone_tab, build_presenter_tab  # noqa: E402
 
 HOST = "127.0.0.1"
-PORT = 7860
+PORT = int(os.environ.get("DEMO_PORT", "7860"))
 SAMPLES_DIR = Path(__file__).resolve().parent / "samples"
 STREAM_MIN_INTERVAL_S = 0.3  # throttles live-webcam predictions to a few per second
 
