@@ -154,7 +154,10 @@ Completed (Midterm):
 7. Evaluate once on the held-out test set: accuracy, per-class precision/recall/F1, confusion
    matrix.
 8. Recognition/demo: same preprocessing, then model, then argmax, then label and confidence
-   overlay. Predictions under 0.60 confidence are shown as "Uncertain".
+   overlay. Each class has its own confidence threshold, selected on the validation set
+   (`models/class_thresholds.json`, global fallback 0.59; see `results/class_thresholds.json`
+   and `results/threshold_selection.json`); predictions below the predicted class's threshold
+   are shown as "Uncertain".
 
 **Planned for the Final project:** convert the recognized class into a sort decision and a
 motor command sequence for the robot.
@@ -175,7 +178,7 @@ loading instructions in [`models/README.md`](models/README.md).
 ```
 Completed (Midterm):
 Input Image / Camera -> Preprocessing (resize 224x224, RGB) -> MobileNetV2 + classifier head
--> Softmax prediction -> Confidence check (>= 0.60?) -> Class label / "Uncertain" -> Visual output
+-> Softmax prediction -> Confidence check (>= per-class threshold?) -> Class label / "Uncertain" -> Visual output
 
 Planned for the Final project:
 Camera -> Computer Vision (above) -> Decision (choose destination) -> Robot Control (motor

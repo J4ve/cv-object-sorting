@@ -124,7 +124,8 @@ def _label_bits(result: dict) -> tuple[str, str, str]:
     if result["label"] == "Waiting...":
         return "#9ca3af", "Waiting...", ""
     if result["is_uncertain"]:
-        sub = f'best guess: {result["raw_label"]} {result["confidence"] * 100:.1f}% (below 60%)'
+        sub = (f'best guess: {result["raw_label"]} {result["confidence"] * 100:.1f}%, '
+               f'below {result["raw_label"]}\'s {result["threshold_used"] * 100:.0f}%')
         return "#d97706", "Uncertain", sub
     return "#15803d", f'{result["label"]} · {result["confidence"] * 100:.1f}%', ""
 
@@ -132,7 +133,7 @@ def _label_bits(result: dict) -> tuple[str, str, str]:
 def _own_card_html(name: str, result: dict) -> str:
     color, main, sub = _label_bits(result)
     name = html.escape(name)
-    sub_html = f' <span style="color:{color};">({sub.replace(" (below 60%)", ", below 60%")})</span>' if sub else ""
+    sub_html = f' <span style="color:{color};">({sub})</span>' if sub else ""
     return (
         f'<p style="margin:4px 0; font-size:1.1em;">{name}: '
         f'<strong style="color:{color};">{main}</strong>{sub_html} '

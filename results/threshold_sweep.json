@@ -1,0 +1,53 @@
+{
+  "validation_sweep": [
+    {
+      "threshold": 0.4,
+      "coverage": 0.9828,
+      "accuracy_on_covered": 0.864,
+      "pct_wrong_caught_as_uncertain": 0.1014,
+      "n_images": 464
+    },
+    {
+      "threshold": 0.5,
+      "coverage": 0.9461,
+      "accuracy_on_covered": 0.877,
+      "pct_wrong_caught_as_uncertain": 0.2174,
+      "n_images": 464
+    },
+    {
+      "threshold": 0.6,
+      "coverage": 0.8836,
+      "accuracy_on_covered": 0.9098,
+      "pct_wrong_caught_as_uncertain": 0.4638,
+      "n_images": 464
+    },
+    {
+      "threshold": 0.7,
+      "coverage": 0.8103,
+      "accuracy_on_covered": 0.9362,
+      "pct_wrong_caught_as_uncertain": 0.6522,
+      "n_images": 464
+    },
+    {
+      "threshold": 0.8,
+      "coverage": 0.7349,
+      "accuracy_on_covered": 0.9589,
+      "pct_wrong_caught_as_uncertain": 0.7971,
+      "n_images": 464
+    },
+    {
+      "threshold": 0.9,
+      "coverage": 0.5948,
+      "accuracy_on_covered": 0.9855,
+      "pct_wrong_caught_as_uncertain": 0.942,
+      "n_images": 464
+    }
+  ],
+  "test_at_0.60": {
+    "threshold": 0.6,
+    "coverage": 0.8707,
+    "accuracy_on_covered": 0.9381,
+    "pct_wrong_caught_as_uncertain": 0.5536,
+    "n_images": 464
+  }
+}

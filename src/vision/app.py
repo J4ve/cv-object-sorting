@@ -29,7 +29,7 @@ import gradio as gr
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from src.vision.classifier import CONF_THRESH, WasteClassifier  # noqa: E402
+from src.vision.classifier import WasteClassifier  # noqa: E402
 from src.vision.remote import build_phone_tab, build_presenter_tab  # noqa: E402
 
 HOST = "127.0.0.1"
@@ -94,7 +94,8 @@ def _card_html(image: Image.Image, title: str, result: dict | None, error: str |
             f'Uncertain'
             f'<span style="font-size:0.28em; font-weight:400; color:#6b7280;"> ({result["latency_ms"]:.0f} ms)</span></p>'
             f'<p style="margin:0 0 8px 0; font-weight:600; font-size:1.3em; color:{color};">'
-            f'best guess: {result["raw_label"]} {result["confidence"] * 100:.1f}% (below 60%)</p>'
+            f'best guess: {result["raw_label"]} {result["confidence"] * 100:.1f}% '
+            f'(below {result["raw_label"]}\'s {result["threshold_used"] * 100:.0f}%)</p>'
             f"{_bars_html(result['probabilities'])}"
         )
     else:
@@ -178,7 +179,8 @@ with gr.Blocks(title="Waste Classifier (RealWaste, Midterm demo)", analytics_ena
     gr.Markdown("# Waste Classifier - SEE and RECOGNIZE")
     gr.Markdown(
         "Upload images, use the live webcam, or try a sample below to classify waste "
-        f"into 5 RealWaste classes (predictions under {CONF_THRESH * 100:.0f}% confidence show as 'Uncertain')."
+        "into 5 RealWaste classes (each class has its own confidence threshold, selected "
+        "on the validation set; predictions below it show as 'Uncertain')."
     )
     gr.Markdown(
         "_Planned for the Final project: using this recognition to decide a sorting "

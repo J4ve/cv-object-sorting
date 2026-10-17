@@ -1,0 +1,11 @@
+{
+  "per_class_auc": {
+    "Cardboard": 0.9863,
+    "Glass": 0.9867,
+    "Metal": 0.9835,
+    "Paper": 0.9942,
+    "Plastic": 0.974
+  },
+  "macro_auc": 0.9856,
+  "n_test": 464
+}

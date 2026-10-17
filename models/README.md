@@ -25,8 +25,21 @@ Trained in two stages (`src/training/Midterm_Object_Sorting_RealWaste.ipynb`, St
 ['Cardboard', 'Glass', 'Metal', 'Paper', 'Plastic']
 ```
 
-Predictions are the softmax argmax over this exact order; a prediction below 0.60 confidence
-is reported as "Uncertain" rather than forced into a class.
+Predictions are the softmax argmax over this exact order; a prediction below that predicted
+class's own confidence threshold is reported as "Uncertain" rather than forced into a class.
+Thresholds are per class (`class_thresholds.json`, below), selected on the validation set with
+a global fallback of 0.59; see `results/class_thresholds.json` and
+`results/threshold_selection.json` for the selection data.
+
+## Per-class confidence thresholds
+
+`class_thresholds.json` holds one confidence threshold per class, e.g. `{"Cardboard": 0.64,
+"Glass": 0.58, "Metal": 0.52, "Paper": 0.55, "Plastic": 0.6}`. For each class, it's the
+smallest threshold where validation precision among kept predictions reaches 90% (falling
+back to the global threshold, 0.59, when a class has too few validation predictions or never
+reaches 90%). Produced by `src/training/Midterm_Object_Sorting_RealWaste.ipynb` (Step 6g);
+full selection data, including any fallbacks and the test-set check, is in
+`results/class_thresholds.json`.
 
 ## Model file / access
 

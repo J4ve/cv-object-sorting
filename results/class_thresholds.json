@@ -1,0 +1,153 @@
+{
+  "method": "for each predicted class, smallest t with validation precision-on-kept >= 90% and at least 20 kept predictions; else fall back to the global threshold (Step 6f rule)",
+  "global_threshold_for_comparison": 0.59,
+  "old_threshold_for_comparison": 0.6,
+  "per_class_thresholds": {
+    "Cardboard": {
+      "t_c": 0.64,
+      "is_fallback": false,
+      "fallback_reason": null,
+      "n_validation_predictions_of_class": 73
+    },
+    "Glass": {
+      "t_c": 0.58,
+      "is_fallback": false,
+      "fallback_reason": null,
+      "n_validation_predictions_of_class": 59
+    },
+    "Metal": {
+      "t_c": 0.52,
+      "is_fallback": false,
+      "fallback_reason": null,
+      "n_validation_predictions_of_class": 118
+    },
+    "Paper": {
+      "t_c": 0.55,
+      "is_fallback": false,
+      "fallback_reason": null,
+      "n_validation_predictions_of_class": 78
+    },
+    "Plastic": {
+      "t_c": 0.6,
+      "is_fallback": false,
+      "fallback_reason": null,
+      "n_validation_predictions_of_class": 136
+    }
+  },
+  "test_evaluation": {
+    "per_class_thresholds_policy": {
+      "overall_coverage": 0.8858,
+      "overall_selective_accuracy": 0.9319,
+      "errors_caught": 28,
+      "errors_total": 56,
+      "per_class": {
+        "Cardboard": {
+          "n_predicted": 67,
+          "n_kept": 53,
+          "coverage": 0.791,
+          "precision_on_kept": 1.0
+        },
+        "Glass": {
+          "n_predicted": 66,
+          "n_kept": 60,
+          "coverage": 0.9091,
+          "precision_on_kept": 0.8833
+        },
+        "Metal": {
+          "n_predicted": 116,
+          "n_kept": 106,
+          "coverage": 0.9138,
+          "precision_on_kept": 0.934
+        },
+        "Paper": {
+          "n_predicted": 85,
+          "n_kept": 78,
+          "coverage": 0.9176,
+          "precision_on_kept": 0.8974
+        },
+        "Plastic": {
+          "n_predicted": 130,
+          "n_kept": 114,
+          "coverage": 0.8769,
+          "precision_on_kept": 0.9474
+        }
+      }
+    },
+    "global_threshold_policy": {
+      "overall_coverage": 0.8772,
+      "overall_selective_accuracy": 0.9337,
+      "errors_caught": 29,
+      "errors_total": 56,
+      "per_class": {
+        "Cardboard": {
+          "n_predicted": 67,
+          "n_kept": 56,
+          "coverage": 0.8358,
+          "precision_on_kept": 0.9643
+        },
+        "Glass": {
+          "n_predicted": 66,
+          "n_kept": 60,
+          "coverage": 0.9091,
+          "precision_on_kept": 0.8833
+        },
+        "Metal": {
+          "n_predicted": 116,
+          "n_kept": 101,
+          "coverage": 0.8707,
+          "precision_on_kept": 0.9505
+        },
+        "Paper": {
+          "n_predicted": 85,
+          "n_kept": 76,
+          "coverage": 0.8941,
+          "precision_on_kept": 0.9079
+        },
+        "Plastic": {
+          "n_predicted": 130,
+          "n_kept": 114,
+          "coverage": 0.8769,
+          "precision_on_kept": 0.9474
+        }
+      }
+    },
+    "old_0.60_policy": {
+      "overall_coverage": 0.8707,
+      "overall_selective_accuracy": 0.9381,
+      "errors_caught": 31,
+      "errors_total": 56,
+      "per_class": {
+        "Cardboard": {
+          "n_predicted": 67,
+          "n_kept": 56,
+          "coverage": 0.8358,
+          "precision_on_kept": 0.9643
+        },
+        "Glass": {
+          "n_predicted": 66,
+          "n_kept": 60,
+          "coverage": 0.9091,
+          "precision_on_kept": 0.8833
+        },
+        "Metal": {
+          "n_predicted": 116,
+          "n_kept": 100,
+          "coverage": 0.8621,
+          "precision_on_kept": 0.96
+        },
+        "Paper": {
+          "n_predicted": 85,
+          "n_kept": 74,
+          "coverage": 0.8706,
+          "precision_on_kept": 0.9189
+        },
+        "Plastic": {
+          "n_predicted": 130,
+          "n_kept": 114,
+          "coverage": 0.8769,
+          "precision_on_kept": 0.9474
+        }
+      }
+    }
+  }
+}
