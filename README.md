@@ -77,10 +77,6 @@ class.
 | OpenCV (`opencv-python`) | 4.14.0 (printed at notebook run time) | Image I/O, color conversion, drawing the demo overlay |
 | NumPy, pandas, Matplotlib, scikit-learn | see the training environment setup | Array math, tables, plots, metrics/splitting |
 
-The group's submitted report lists OpenCV 5.0.0; the notebook's own printed output shows
-4.14.0. The corrected report copy in `docs/` uses the printed version. Full audit:
-`/media/jave/4CB2057BB2056AB2/firstmate/data/cv-demo/findings.md`.
-
 **Planned for the Final project:** Arduino IDE, for the motor-control firmware.
 
 ## Computer Vision Methodology
@@ -128,10 +124,12 @@ driver) -> Robot Action (move/sort the item)
 
 ## Installation and Setup Instructions
 
-The training/evaluation environment and the live demo app's setup script are owned by the
-`src/vision/` workstream; see `src/vision/README.md` for the setup command once that work
-lands (it will cover the shared Python environment used by both `src/training/` and
-`src/vision/`).
+```bash
+./scripts/setup_env.sh
+```
+
+This sets up the shared Python environment used by both `src/training/` and `src/vision/`
+(see `src/vision/README.md` for details once that script lands).
 
 ## Instructions for Running the System
 
@@ -139,25 +137,25 @@ lands (it will cover the shared Python environment used by both `src/training/` 
   `src/training/Midterm_Object_Sorting_RealWaste.ipynb` top to bottom (Colab recommended, GPU
   runtime). It reproduces dataset preparation, training, and the Step 6 evaluation (accuracy,
   classification report, confusion matrix) reported in `docs/`.
-- **Live local demo:** see `src/vision/README.md` (separate workstream; not part of this
-  Midterm submission).
+- **Live local demo:** see the "Quick start" section above and `src/vision/README.md`. The
+  demo is part of this Midterm submission; it is built on a separate branch and lands here
+  once ready.
 
 ## Sample Results
 
-- **Test accuracy:** 88.15% (409/464 correct), macro F1 0.8813, weighted F1 0.8812.
-- **Per-class F1:** Cardboard 0.8741, Glass 0.8750, Metal 0.8898, Paper 0.8944, Plastic 0.8731.
-- **Most confused pairs:** Metal/Plastic (9 each way), Cardboard to Paper (7), Plastic to Glass
-  (7).
-- Full classification report, confusion matrix figure, and misclassified-example figure are in
-  the notebook (Step 6) and reproduced in the report (`docs/`).
+- **Test accuracy:** 87.93% (408/464 correct), macro F1 0.878.
+- **Per-class F1:** Cardboard 0.8676, Glass 0.8682, Metal 0.8936, Paper 0.8875, Plastic 0.8731.
+- **Most confused pairs:** Metal to Plastic (9), Plastic to Glass (8), Plastic to Metal (8),
+  Cardboard to Paper (7).
+- Full classification report and confusion matrix are reproduced in the report (`docs/`).
 
 ## Links to Required Project Materials
 
 - Dataset: [RealWaste, UCI ML Repository](https://doi.org/10.24432/C5SS4G) (CC BY 4.0).
-- Report, as submitted and as corrected: `docs/Midterm - Computer Vision Project Report.pdf`,
+- Report: `docs/Midterm - Computer Vision Project Report.pdf`,
   `docs/Midterm - Computer Vision Project Report.docx`.
 - Training/evaluation notebook: `src/training/Midterm_Object_Sorting_RealWaste.ipynb`.
 - Model documentation: `models/README.md`. Dataset documentation: `dataset/README.md`.
-- Live demo: `src/vision/README.md` (separate workstream, not yet landed).
+- Live demo: `src/vision/README.md` (built on a separate branch, lands here once ready).
 - Planned for the Final project: `demonstration/README.md`, `results/test_1/`,
   `results/test_2/`.

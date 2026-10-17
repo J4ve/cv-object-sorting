@@ -19,6 +19,7 @@ dataset/images/
 *.pth
 *.onnx
 *.tflite
+!models/*.keras
 
 # Python
 __pycache__/

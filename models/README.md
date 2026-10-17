@@ -30,11 +30,12 @@ is reported as "Uncertain" rather than forced into a class.
 
 ## Model file / access
 
-**Not yet populated.** The notebook run that produced the reported 88.15% test accuracy
-(`src/training/Midterm_Object_Sorting_RealWaste.ipynb`, Step 8) saved `waste_classifier.keras`
-to the Colab session, but that file was not exported from Colab and is not present in the
-group's submitted materials. No trained weights are committed to this repository yet. See
-`src/vision/README.md` for the live-demo owner's plan to retrain and export weights here.
+**Not yet populated.** The report (`docs/`) cites 87.93% test accuracy, from a separate local
+run of this same pipeline whose weights file (`waste_classifier.keras`) has not been placed in
+this repository yet. A different notebook run saved to a Colab session (88.15% test accuracy,
+not the number in the report) was also never exported from Colab. No trained weights are
+committed here yet; they will be added once the live demo (`src/vision/README.md`) retrains
+and exports the model that matches the report's numbers.
 
 ## Loading the model (once weights are added)
 

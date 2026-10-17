@@ -56,7 +56,9 @@ project report (`docs/`, Table 1 / Section 3.5).
 - Training-only augmentation: random horizontal/vertical flip, rotation (±15%), zoom (±15%),
   brightness (±20%), contrast (±20%).
 
-## Final-stage placeholder
+## Planned for the Final project
 
-*Final-only, not part of the Midterm submission.* The Final dataset requirements (5 required
-classes, 150+ samples/class, 50+ unseen real-world test images) are not addressed here.
+The Final submission expands this same dataset: 150+ samples per class (up from the Midterm's
+100+), and at least 50 additional unseen real-world test images (or 3 unseen test scenarios)
+captured by the group and kept separate from training/validation, to evaluate how well the
+classifier generalizes beyond RealWaste's own camera and lighting.
