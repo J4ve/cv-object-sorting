@@ -70,6 +70,13 @@ fine on CPU.
   first (step 3 above) to produce `models/waste_classifier.keras` and
   `models/class_names.json`.
 
+## Live demo over Google Meet
+
+For presenting to the class, groupmates join from their own phones over a secure link while
+every classification still runs on the presenter's own computer, with a Presenter view to
+switch between connected phones live. See [`docs/remote-demo.md`](docs/remote-demo.md) for
+how it works and how to reproduce it.
+
 ## Project Title
 
 Visual Object Sorting Robot: Computer Vision Midterm (RealWaste Waste Classification)
@@ -198,7 +205,9 @@ This sets up the shared Python environment used by both `src/training/` and `src
 
 - **Training / evaluation notebook:** run
   `src/training/Midterm_Object_Sorting_RealWaste.ipynb` top to bottom (Colab recommended, GPU
-  runtime). It reproduces dataset preparation, training, and the Step 6 evaluation (accuracy,
+  runtime), or open the group's shared copy directly:
+  [Colab notebook](https://colab.research.google.com/drive/1Uunfl1tFrYVt09Iig5-hYnvL3mn288m5?usp=sharing).
+  It reproduces dataset preparation, training, and the Step 6 evaluation (accuracy,
   classification report, confusion matrix) reported in `docs/`.
 - **Live local demo:** see the "Quick start" section above and `src/vision/README.md`.
 
@@ -208,14 +217,30 @@ This sets up the shared Python environment used by both `src/training/` and `src
 - **Per-class F1:** Cardboard 0.8676, Glass 0.8682, Metal 0.8936, Paper 0.8875, Plastic 0.8731.
 - **Most confused pairs:** Metal to Plastic (9), Plastic to Glass (8), Plastic to Metal (8),
   Cardboard to Paper (7).
-- Full classification report and confusion matrix are reproduced in the report (`docs/`).
+- Full classification report and confusion matrix are reproduced in the report
+  ([`docs/Midterm - Computer Vision Project Report.pdf`](<docs/Midterm - Computer Vision Project Report.pdf>)).
+
+<p align="center"><img src="results/roc_curves.png" width="500" alt="One-vs-rest ROC curves per class on the test set"><br><sub>Figure 1. One-vs-rest ROC curves, test set; macro-average AUC 0.986.</sub></p>
+
+<p align="center"><img src="results/reliability_diagram.png" width="650" alt="Reliability diagram before and after temperature scaling"><br><sub>Figure 2. Reliability diagram, test set: ECE 2.92% with raw softmax, 3.08% after temperature scaling (analysis only; the deployed demo uses raw softmax).</sub></p>
+
+<p align="center"><img src="results/class_thresholds.png" width="650" alt="Per-class confidence threshold selection curves"><br><sub>Figure 3. Per-class confidence thresholds selected on the validation set: Cardboard 0.64, Glass 0.58, Metal 0.52, Paper 0.55, Plastic 0.60.</sub></p>
+
+<p align="center"><img src="results/misclassified_samples.png" width="650" alt="Grid of misclassified test images"><br><sub>Figure 4. Ten misclassified test images, captioned true / predicted (confidence).</sub></p>
+
+**Unseen TrashNet test** (500 images, 100 per class, never seen during training): 56.00%
+overall accuracy, well below the 87.93% RealWaste test accuracy (domain shift; see the
+report's Section 6.5 for the full breakdown).
+
+<p align="center"><img src="results/unseen_trashnet_confusion_matrix.png" width="500" alt="Confusion matrix on the unseen TrashNet test set"><br><sub>Figure 5. Confusion matrix on the 500-image unseen TrashNet test set.</sub></p>
 
 ## Links to Required Project Materials
 
 - Dataset: [RealWaste, UCI ML Repository](https://doi.org/10.24432/C5SS4G) (CC BY 4.0).
-- Report: `docs/Midterm - Computer Vision Project Report.pdf`,
+- Report: [`docs/Midterm - Computer Vision Project Report.pdf`](<docs/Midterm - Computer Vision Project Report.pdf>),
   `docs/Midterm - Computer Vision Project Report.docx`.
-- Training/evaluation notebook: `src/training/Midterm_Object_Sorting_RealWaste.ipynb`.
+- Training/evaluation notebook: `src/training/Midterm_Object_Sorting_RealWaste.ipynb`
+  ([Colab copy](https://colab.research.google.com/drive/1Uunfl1tFrYVt09Iig5-hYnvL3mn288m5?usp=sharing)).
 - Model documentation: `models/README.md`. Dataset documentation: `dataset/README.md`.
 - Live demo: `src/vision/README.md`.
 - Planned for the Final project: `demonstration/README.md`, `results/test_1/`,
