@@ -320,8 +320,11 @@ def style_table(table, *, header=True):
             for node in tc_pr.findall(qn("w:vAlign")):
                 tc_pr.remove(node)
             tc_pr.append(el("w:vAlign", val="center"))
+            # the last row keeps with the caption that follows the table
+            last_row = row_index == len(table.rows) - 1
             for p in cell.paragraphs:
-                set_ppr(p, align="left", before=20, after=20, line=240, keep_lines=False)
+                set_ppr(p, align="left", before=20, after=20, line=240,
+                        keep_next=last_row, keep_lines=True)
                 set_run_props(p, size=TABLE_SIZE, bold=True if is_header else None)
 
 
