@@ -56,3 +56,25 @@ corrupt image files are caught per-image and reported in the UI instead of
 crashing the server.
 
 Stop the server with Ctrl+C.
+
+## Sample images
+
+`src/vision/samples/` has one small (resized to 512px max side) example image
+per class for one-click testing in the Upload tab. They come from the
+RealWaste dataset: Single, S., & Iranmanesh, S. (University of Wollongong),
+*RealWaste* [Data set]. The dataset's authors license it CC BY-NC-SA 4.0 (the
+UCI mirror lists CC BY 4.0; we follow the more restrictive author license).
+Only these few small sample images are committed here for demo convenience;
+the full dataset itself is never committed.
+
+## Demo tips
+
+The model is trained on RealWaste's landfill-sorted photos, so accuracy can
+drop on clean, new-looking objects (a large domain shift from landfill items
+to pristine ones). For the most reliable live results:
+- Use real, used, or slightly crumpled items in plain, even light.
+- If unsure, start with the one-click RealWaste sample images to see a
+  confident, correct prediction first.
+- A result labeled "Uncertain" means the model's top confidence was too low
+  to trust; try a different angle or lighting rather than treating it as a
+  wrong class.

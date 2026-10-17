@@ -43,7 +43,17 @@ print(f"Model ready. Classes: {classifier.class_names}")
 _last_stream_ts = 0.0
 
 
-def _thumb_data_uri(image: Image.Image, max_side: int = 180) -> str:
+CLASS_COLORS = {
+    "Cardboard": "#92400e",
+    "Glass": "#0f766e",
+    "Metal": "#334155",
+    "Paper": "#1d4ed8",
+    "Plastic": "#b91c1c",
+    "Uncertain": "#d97706",
+}
+
+
+def _thumb_data_uri(image: Image.Image, max_side: int = 360) -> str:
     img = image.copy()
     img.thumbnail((max_side, max_side))
     buf = io.BytesIO()
@@ -59,12 +69,12 @@ def _bars_html(probabilities: dict, top_n: int = 3) -> str:
         pct = p * 100
         rows.append(
             f"""
-            <div style="margin:4px 0;">
-              <div style="display:flex; justify-content:space-between; font-size:0.85em;">
+            <div style="margin:8px 0;">
+              <div style="display:flex; justify-content:space-between; font-size:1.05em;">
                 <span>{cls}</span><span>{pct:.1f}%</span>
               </div>
-              <div style="background:#e5e7eb; border-radius:4px; height:8px;">
-                <div style="background:#4c78a8; width:{pct:.1f}%; height:8px; border-radius:4px;"></div>
+              <div style="background:#e5e7eb; border-radius:6px; height:16px;">
+                <div style="background:#4c78a8; width:{pct:.1f}%; height:16px; border-radius:6px;"></div>
               </div>
             </div>
             """
@@ -75,20 +85,21 @@ def _bars_html(probabilities: dict, top_n: int = 3) -> str:
 def _card_html(image: Image.Image, title: str, result: dict | None, error: str | None = None) -> str:
     thumb = _thumb_data_uri(image)
     if error:
-        body = f'<p style="color:#b91c1c;">Could not classify this image: {error}</p>'
+        body = f'<p style="color:#b91c1c; font-size:1.1em;">Could not classify this image: {error}</p>'
     else:
-        color = "#d97706" if result["is_uncertain"] else "#15803d"
+        color = CLASS_COLORS.get(result["label"], "#334155")
         body = (
-            f'<p style="margin:2px 0; font-weight:600; color:{color};">'
-            f'{result["label"]} &middot; {result["confidence"] * 100:.1f}% '
-            f'<span style="color:#6b7280; font-weight:400;">({result["latency_ms"]:.0f} ms)</span></p>'
+            f'<p style="margin:4px 0; font-weight:800; font-size:2.6em; line-height:1.1; color:{color};">'
+            f'{result["label"]} '
+            f'<span style="font-size:0.5em; font-weight:600; color:#374151;">{result["confidence"] * 100:.1f}%</span>'
+            f'<span style="font-size:0.32em; font-weight:400; color:#6b7280;"> ({result["latency_ms"]:.0f} ms)</span></p>'
             f"{_bars_html(result['probabilities'])}"
         )
     return f"""
-    <div style="display:flex; gap:12px; border:1px solid #e5e7eb; border-radius:8px; padding:10px; margin-bottom:10px; align-items:flex-start;">
-      <img src="{thumb}" style="width:140px; height:140px; object-fit:cover; border-radius:6px; flex-shrink:0;"/>
+    <div style="display:flex; gap:16px; border:1px solid #e5e7eb; border-radius:10px; padding:14px; margin-bottom:14px; align-items:flex-start;">
+      <img src="{thumb}" style="width:220px; height:220px; object-fit:cover; border-radius:8px; flex-shrink:0;"/>
       <div style="flex:1; min-width:0;">
-        <p style="margin:0 0 4px 0; font-size:0.8em; color:#6b7280; word-break:break-all;">{title}</p>
+        <p style="margin:0 0 4px 0; font-size:0.85em; color:#6b7280; word-break:break-all;">{title}</p>
         {body}
       </div>
     </div>
@@ -146,14 +157,18 @@ def classify_stream(frame):
     return _card_html(frame, "live camera", result)
 
 
+SCREEN_SHARE_CSS = """
+.tab-nav button { font-size: 1.3em !important; font-weight: 700 !important; }
+body, .gradio-container { font-size: 1.3em; }
+"""
+
 with gr.Blocks(title="Waste Classifier (RealWaste, Midterm demo)", analytics_enabled=False) as demo:
+    gr.Markdown("# Waste Classifier - SEE and RECOGNIZE")
     gr.Markdown(
-        "# Waste Classifier - SEE and RECOGNIZE\n"
-        "Midterm Computer Vision demo: MobileNetV2 transfer learning on 5 RealWaste "
-        "classes (Cardboard, Glass, Metal, Paper, Plastic). Upload images, use the live "
-        "webcam, or try a sample below. Each prediction shows its confidence, top-3 "
-        "probabilities, and latency. Predictions below "
-        f"{CONF_THRESH * 100:.0f}% confidence are reported as 'Uncertain'.\n\n"
+        "Upload images, use the live webcam, or try a sample below to classify waste "
+        f"into 5 RealWaste classes (predictions under {CONF_THRESH * 100:.0f}% confidence show as 'Uncertain')."
+    )
+    gr.Markdown(
         "_Planned for the Final project: using this recognition to decide a sorting "
         "destination and drive a 4WD robot to act on it._"
     )
@@ -165,7 +180,10 @@ with gr.Blocks(title="Waste Classifier (RealWaste, Midterm demo)", analytics_ena
 
         sample_paths = sorted(str(p) for p in SAMPLES_DIR.glob("*.jpg")) if SAMPLES_DIR.exists() else []
         if sample_paths:
-            gr.Markdown("**Or try a sample image** (held-out test images, RealWaste dataset, CC BY 4.0):")
+            gr.Markdown(
+                "**Or try a sample image** (held-out test images, RealWaste dataset, "
+                "CC BY-NC-SA 4.0 per the authors' IEEE DataPort listing):"
+            )
             sample_input = gr.Image(type="pil", visible=False)
             sample_out = gr.HTML()
             gr.Examples(examples=sample_paths, inputs=sample_input, outputs=sample_out, fn=classify_sample, run_on_click=True)
@@ -181,4 +199,12 @@ with gr.Blocks(title="Waste Classifier (RealWaste, Midterm demo)", analytics_ena
 
 
 if __name__ == "__main__":
-    demo.launch(server_name=HOST, server_port=PORT, show_error=True, share=False, inbrowser=False)
+    demo.launch(
+        server_name=HOST,
+        server_port=PORT,
+        show_error=True,
+        share=False,
+        inbrowser=False,
+        theme=gr.themes.Default(text_size="lg"),
+        css=SCREEN_SHARE_CSS,
+    )

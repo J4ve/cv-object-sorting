@@ -10,12 +10,12 @@
 #   python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
 
 tensorflow==2.21.0
-pandas>=2.2
-scikit-learn>=1.5
-opencv-python-headless>=4.10
-matplotlib>=3.9
-pillow>=10.4
-gradio>=4.44
+pandas==3.0.6
+scikit-learn==1.9.1
+opencv-python-headless==5.0.0.93
+matplotlib==3.11.2
+pillow==13.0.0
+gradio==6.30.0
 
 # Notebook / exploration
 jupyter==1.0.0

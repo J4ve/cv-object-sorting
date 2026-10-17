@@ -8,7 +8,67 @@ as finished work.
 
 ## Quick start (live demo on your machine)
 
-_Owned by the `src/vision/` workstream; content lands with the demo._
+Needs Python 3.12. An NVIDIA GPU is optional; the demo and training both run
+fine on CPU.
+
+1. Clone and enter the repo:
+
+   ```bash
+   git clone https://github.com/J4ve/cv-object-sorting.git
+   cd cv-object-sorting
+   ```
+
+2. Create and activate a virtual environment, then install dependencies. Easiest: run the setup script.
+
+   **Linux / macOS:**
+   ```bash
+   ./scripts/setup_env.sh
+   source .venv/bin/activate
+   ```
+
+   **Windows (PowerShell):**
+   ```powershell
+   python -m venv .venv
+   .venv\Scripts\Activate.ps1
+   pip install -r requirements.txt
+   ```
+
+3. Get the trained model (if `models/waste_classifier.keras` is not already in the repo):
+
+   ```bash
+   python src/training/train_export.py
+   ```
+
+   This downloads the RealWaste dataset and reproduces the training pipeline.
+   It takes a while (longer on CPU); skip it if `models/waste_classifier.keras`
+   and `models/class_names.json` are already present.
+
+4. Start the demo server:
+
+   ```bash
+   python src/vision/app.py
+   ```
+
+5. Open **http://127.0.0.1:7860** in a browser. You should see "Waste
+   Classifier - SEE and RECOGNIZE" with tabs for uploading images and for a
+   live webcam. Try one of the one-click sample images first, or upload your
+   own, or allow camera access for live classification. Each result shows
+   the predicted class, confidence, and top-3 probability bars.
+
+6. Stop the server with `Ctrl+C` in the terminal running it.
+
+### Troubleshooting
+
+- **Port already in use:** another process is using 7860. Stop it, or edit
+  `PORT` in `src/vision/app.py` and reopen the new URL.
+- **No GPU detected:** this is expected and fine; both training and the demo
+  run on CPU by default. See `requirements.txt` for the optional GPU extra.
+- **Webcam permission denied / no camera:** allow camera access when the
+  browser prompts, or use the Upload tab with the sample images or your own
+  files instead.
+- **"Model not found" error:** run `python src/training/train_export.py`
+  first (step 3 above) to produce `models/waste_classifier.keras` and
+  `models/class_names.json`.
 
 ## Project Title
 
@@ -137,9 +197,7 @@ This sets up the shared Python environment used by both `src/training/` and `src
   `src/training/Midterm_Object_Sorting_RealWaste.ipynb` top to bottom (Colab recommended, GPU
   runtime). It reproduces dataset preparation, training, and the Step 6 evaluation (accuracy,
   classification report, confusion matrix) reported in `docs/`.
-- **Live local demo:** see the "Quick start" section above and `src/vision/README.md`. The
-  demo is part of this Midterm submission; it is built on a separate branch and lands here
-  once ready.
+- **Live local demo:** see the "Quick start" section above and `src/vision/README.md`.
 
 ## Sample Results
 
@@ -156,6 +214,6 @@ This sets up the shared Python environment used by both `src/training/` and `src
   `docs/Midterm - Computer Vision Project Report.docx`.
 - Training/evaluation notebook: `src/training/Midterm_Object_Sorting_RealWaste.ipynb`.
 - Model documentation: `models/README.md`. Dataset documentation: `dataset/README.md`.
-- Live demo: `src/vision/README.md` (built on a separate branch, lands here once ready).
+- Live demo: `src/vision/README.md`.
 - Planned for the Final project: `demonstration/README.md`, `results/test_1/`,
   `results/test_2/`.
