@@ -1,23 +1,18 @@
 #!/usr/bin/env python3
-"""Generate the two hand-drawn figures used by the Midterm report.
+"""Draw ``docs/images/system-architecture.png``, Figure 1 of the Midterm report.
 
-1. ``results/dataset_distribution.png`` - images per class and per split. Every
-   number is read from ``dataset/split.csv`` and ``models/class_names.json``,
-   the same split that produced ``results/results.json``, so the chart can never
-   drift from Table 1 of the report.
-2. ``docs/images/system-architecture.png`` - the labeled block diagram of the
-   system as implemented (Figure 1 of the report).
+This is a diagram, not data: it has no numbers to read from the dataset, so it
+is drawn here rather than in the notebook. Every figure in the report that does
+carry data is produced by an executed cell of
+``src/training/Midterm_Object_Sorting_RealWaste.ipynb``.
 
 Run from the repository root:
 
-    python3 scripts/make_report_figures.py
+    python3 docs/images/make_architecture_figure.py
 """
 
 from __future__ import annotations
 
-import csv
-import json
-from collections import Counter
 from pathlib import Path
 
 import matplotlib
@@ -28,7 +23,7 @@ from matplotlib import font_manager
 from matplotlib import pyplot as plt
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 
 # The report is set in Arial, so the figures are too.
 for _candidate in (
@@ -48,102 +43,8 @@ plt.rcParams.update(
     }
 )
 
-SPLITS = ["train", "val", "test"]
-SPLIT_LABELS = {"train": "Training (70%)", "val": "Validation (15%)", "test": "Testing (15%)"}
-# Validated for colorblind separation (OKLab dE >= 8 on every adjacent pair);
-# the orange sits below 3:1 against white, so every segment carries a printed count.
-SPLIT_COLORS = {"train": "#2E6DA4", "val": "#E0922B", "test": "#7A5195"}
-
 INK = "#1a1a1a"
 MUTED = "#555555"
-
-
-def read_counts() -> tuple[list[str], dict[str, dict[str, int]]]:
-    """Per-class, per-split image counts, straight from the executed split."""
-    class_names = json.loads((ROOT / "models" / "class_names.json").read_text())
-    counts = Counter()
-    with (ROOT / "dataset" / "split.csv").open(newline="") as handle:
-        for row in csv.DictReader(handle):
-            counts[(class_names[int(row["label"])], row["split"])] += 1
-    per_class = {
-        name: {split: counts[(name, split)] for split in SPLITS} for name in class_names
-    }
-    return class_names, per_class
-
-
-def check_against_results(class_names, per_class) -> None:
-    """Fail loudly if the chart would disagree with results.json."""
-    results = json.loads((ROOT / "results" / "results.json").read_text())
-    for name in class_names:
-        total = sum(per_class[name].values())
-        expected = results["images_per_class"][name]
-        if total != expected:
-            raise SystemExit(f"{name}: split.csv has {total} images, results.json says {expected}")
-    for split in SPLITS:
-        total = sum(per_class[name][split] for name in class_names)
-        expected = results["split"][split]
-        if total != expected:
-            raise SystemExit(f"{split}: split.csv has {total} images, results.json says {expected}")
-
-
-def draw_distribution(class_names, per_class, out_path: Path) -> None:
-    fig, ax = plt.subplots(figsize=(7.4, 3.9), dpi=200)
-    x = range(len(class_names))
-    bottoms = [0] * len(class_names)
-
-    for split in SPLITS:
-        values = [per_class[name][split] for name in class_names]
-        bars = ax.bar(
-            x,
-            values,
-            bottom=bottoms,
-            width=0.62,
-            color=SPLIT_COLORS[split],
-            label=SPLIT_LABELS[split],
-            edgecolor="white",
-            linewidth=1.6,
-        )
-        for bar, value in zip(bars, values):
-            # Direct labels: they carry the numbers the orange fill cannot.
-            ax.text(
-                bar.get_x() + bar.get_width() / 2,
-                bar.get_y() + bar.get_height() / 2,
-                str(value),
-                ha="center",
-                va="center",
-                fontsize=8.5,
-                color="white",
-                fontweight="bold",
-            )
-        bottoms = [b + v for b, v in zip(bottoms, values)]
-
-    for xi, total in zip(x, bottoms):
-        ax.text(xi, total + 18, f"{total:,}", ha="center", va="bottom", fontsize=9, color=INK)
-
-    ax.set_xticks(list(x))
-    ax.set_xticklabels(class_names, fontsize=10, color=INK)
-    ax.set_ylabel("Images", fontsize=10, color=INK)
-    ax.set_ylim(0, max(bottoms) * 1.16)
-    ax.tick_params(axis="y", labelsize=9, colors=MUTED, length=0)
-    ax.tick_params(axis="x", length=0)
-    ax.grid(axis="y", color="#e2e2e2", linewidth=0.8)
-    ax.set_axisbelow(True)
-    for side in ("top", "right", "left"):
-        ax.spines[side].set_visible(False)
-    ax.spines["bottom"].set_color("#cccccc")
-    ax.legend(
-        loc="upper center",
-        bbox_to_anchor=(0.5, 1.14),
-        ncol=3,
-        frameon=False,
-        fontsize=9.5,
-        handlelength=1.2,
-        handleheight=1.0,
-        columnspacing=1.8,
-    )
-    fig.tight_layout()
-    fig.savefig(out_path, bbox_inches="tight", facecolor="white")
-    plt.close(fig)
 
 
 def _box(ax, x, y, w, h, title, lines, face, edge, title_size=8.8, body_size=7.5):
@@ -272,17 +173,10 @@ def draw_architecture(out_path: Path) -> None:
 
 
 def main() -> None:
-    class_names, per_class = read_counts()
-    check_against_results(class_names, per_class)
-
-    dist = ROOT / "results" / "dataset_distribution.png"
-    draw_distribution(class_names, per_class, dist)
-    print(f"wrote {dist.relative_to(ROOT)}")
-
-    arch = ROOT / "docs" / "images" / "system-architecture.png"
-    arch.parent.mkdir(parents=True, exist_ok=True)
-    draw_architecture(arch)
-    print(f"wrote {arch.relative_to(ROOT)}")
+    out = ROOT / "docs" / "images" / "system-architecture.png"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    draw_architecture(out)
+    print(f"wrote {out.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":
