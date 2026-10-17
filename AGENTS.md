@@ -47,6 +47,28 @@ or parentheses instead. US English spelling.
   unrelated reload). Gradio's client reconnects on its own, but avoid reloading Caddy while a
   real demo session may be live.
 
+## Report docx and PDF (docs/Midterm - Computer Vision Project Report.*)
+
+- The committed docx is produced by `scripts/restyle_report.py`, which reads the pre-restyle
+  Google Docs export and rewrites its paragraph and table properties. It is guarded so a
+  second run over its own output adds nothing, but the input of record is the docx as it
+  stood before the restyle (commit a65b549).
+- Regenerate the PDF with
+  `soffice -env:UserInstallation=file://<scratch>/lo_profile --headless --convert-to pdf`.
+  Without the private profile a desktop LibreOffice session makes the headless convert
+  silently do nothing.
+- Every figure that carries data must come from an executed notebook cell (captain rule).
+  The dataset distribution chart is a Step 3 cell of
+  `src/training/Midterm_Object_Sorting_RealWaste.ipynb`; only the architecture block
+  diagram is drawn outside it, by `docs/images/make_architecture_figure.py`.
+- OOXML gotchas this document hit: `w:ind` values are twips, while python-docx reports them
+  as EMU, so reading a value and writing it back silently indents by inches; the Google Docs
+  export carried an invalid non-integer `w:line` spacing value, which is what made the first
+  section heading render clipped in Word; and `w:sectPr` must stay the last child of the
+  body, so appended content goes in with `sectPr.addprevious(...)`.
+- The docx still carries one Google Docs review comment on the title. It does not appear in
+  the PDF. Removing it is the captain's call, not a worker's.
+
 ## Maintaining this file
 
 Keep this file for knowledge useful to almost every future agent session in this project.
