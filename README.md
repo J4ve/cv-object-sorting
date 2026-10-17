@@ -6,6 +6,10 @@ assigned the **Object Sorting** specialization (Group Specialization 8). This re
 completed. The robot itself is planned for the Final project and described below as such, not
 as finished work.
 
+## Quick start (live demo on your machine)
+
+_Owned by the `src/vision/` workstream; content lands with the demo._
+
 ## Project Title
 
 Visual Object Sorting Robot: Computer Vision Midterm (RealWaste Waste Classification)
