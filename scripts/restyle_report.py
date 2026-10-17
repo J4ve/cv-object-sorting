@@ -42,6 +42,10 @@ CAPTION_SIZE = 18     # 9 pt
 H1_SIZE = 40          # 20 pt
 H2_SIZE = 32          # 16 pt
 
+# Line spacing in 240ths of a line: 276 is the 1.15 spacing the reference
+# reports use for body text. Headings, captions and table cells stay single.
+BODY_LINE = 276
+
 HEADER_FILL = "EAD1DC"
 BORDER_COLOR = "666666"
 
@@ -56,6 +60,26 @@ H2_RE = re.compile(r"^\d+\.\d+\s+\S")
 # shifts. Applied as a single simultaneous mapping, never chained.
 TABLE_MAP = {2: 4, 3: 5, 4: 6, 5: 7, 6: 8, 7: 9}
 FIGURE_MAP = {2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9, 9: 10, 10: 11}
+
+# The largest (width, height) in inches each figure may take, by figure number.
+# A figure that claims most of a page cannot share it with the text around it,
+# so it jumps to the next page and leaves the gap behind: these caps keep every
+# figure, its caption and its explanation inside roughly half a page. The
+# unlisted figures are wide and short already, so they fill the text width.
+FIGURE_SIZES = {
+    1: (6.0, 3.5),    # architecture diagram
+    2: (5.6, 3.3),    # dataset distribution chart
+    3: (4.9, 4.2),    # class sample grid
+    6: (4.7, 4.4),    # ROC curves
+    7: (3.0, 3.0),    # threshold sweep, placed beside Figure 8
+    8: (3.0, 3.0),    # threshold selection
+    10: (4.4, 3.8),   # TrashNet confusion matrix
+    13: (4.4, 3.8),   # the same matrix, repeated in Appendix C
+    14: (5.6, 3.2),   # presenter view of the demonstration program
+    15: (5.2, 2.1),   # the Uncertain result
+    16: (6.0, 3.5),   # the architecture diagram, repeated in Appendix E
+}
+DEFAULT_FIGURE_SIZE = (6.5, 7.1)
 
 
 # ---------------------------------------------------------------------------
@@ -270,13 +294,15 @@ def add_picture_paragraph(doc, image_path: Path, width_emu: int, *, after_el=Non
 
 
 def caption(doc, text: str, **kwargs):
+    # No keepNext: the figure above already keeps with its caption, and chaining
+    # the caption to the explanation below it drags the whole group to the next
+    # page whenever the explanation does not fit.
     return make_paragraph(
         doc,
         [(text, True, False)],
         align="center",
         before=0,
         after=160,
-        keep_next=True,
         keep_lines=True,
         **kwargs,
     )
@@ -290,6 +316,7 @@ def body(doc, parts, **kwargs):
     joined = "".join(part[0] if isinstance(part, tuple) else part for part in parts)
     kwargs.setdefault("align", justification(joined))
     kwargs.setdefault("after", 120)
+    kwargs.setdefault("line", BODY_LINE)
     return make_paragraph(doc, parts, **kwargs)
 
 
@@ -423,13 +450,21 @@ def restyle(in_path: Path, out_path: Path) -> None:
         set_run_props(title, size=36)
 
     # -- 2. headings, body text, lists --------------------------------------
+    # Only the first major heading starts a new page, so that Section 1 begins
+    # after the cover; the rest follow the text they come after, the way the
+    # reference reports do, separated by space above rather than by white space
+    # to the foot of the page. REFERENCES keeps its break because it ends the
+    # report proper.
+    first_h1 = True
     for p in paragraphs[cover_end:]:
         text = paragraph_text(p).strip()
         if not text:
             continue
         if H1_RE.match(text) or text == "REFERENCES":
-            set_ppr(p, align="left", before=0, after=240, line=240,
-                    keep_next=True, keep_lines=True, page_break=True)
+            page_break = first_h1 or text == "REFERENCES"
+            first_h1 = False
+            set_ppr(p, align="left", before=0 if page_break else 360, after=240,
+                    line=240, keep_next=True, keep_lines=True, page_break=page_break)
             set_run_props(p, size=H1_SIZE, bold=True)
         elif H2_RE.match(text):
             set_ppr(p, align="left", before=240, after=80, line=240,
@@ -437,22 +472,24 @@ def restyle(in_path: Path, out_path: Path) -> None:
             set_run_props(p, size=H2_SIZE, bold=False)
         elif re.match(r"^(Table|Figure) \d+\.", text):
             set_ppr(p, align="center", before=0, after=200, line=240,
-                    keep_next=True, keep_lines=True)
+                    keep_lines=True)
             set_run_props(p, size=CAPTION_SIZE, bold=True)
         elif text in {"General objective:", "Specific objectives:"}:
-            set_ppr(p, align="left", before=120, after=60, line=240, keep_next=True)
+            set_ppr(p, align="left", before=120, after=60, line=BODY_LINE,
+                    keep_next=True)
             set_run_props(p, size=BODY_SIZE, bold=True)
         else:
             num_pr = p._p.find(qn("w:pPr"))
             has_num = num_pr is not None and num_pr.find(qn("w:numPr")) is not None
             if has_num:
                 num_id = num_pr.find(qn("w:numPr")).find(qn("w:numId")).get(qn("w:val"))
-                set_ppr(p, align=justification(text), before=0, after=60, line=240,
-                        left=720, hanging=360, num_id=num_id)
+                set_ppr(p, align=justification(text), before=0, after=60,
+                        line=BODY_LINE, left=720, hanging=360, num_id=num_id)
             elif p._p.findall(".//" + qn("w:drawing")):
                 set_ppr(p, align="center", before=120, after=60, line=240, keep_next=True)
             else:
-                set_ppr(p, align=justification(text), before=0, after=140, line=240)
+                set_ppr(p, align=justification(text), before=0, after=140,
+                        line=BODY_LINE)
             set_run_props(p, size=BODY_SIZE)
 
     # -- 3. renumber the in-text table and figure references ---------------
@@ -572,14 +609,28 @@ def restyle(in_path: Path, out_path: Path) -> None:
         ])
         insert_after(anchor._p, pic, cap, note)
 
-    # every remaining figure is scaled to the text width, capped so that the
-    # figure and its caption still fit on one page
-    from PIL import Image as _Image
+    # every remaining figure is scaled to the size FIGURE_SIZES allows it,
+    # keeping its aspect ratio, so that the figure, its caption and the
+    # paragraph explaining it still share a page with the text around them
+
+    def figure_number(pic):
+        """The number of the figure this picture paragraph belongs to."""
+        node = pic._p.getnext()
+        while node is not None and node.tag == qn("w:p"):
+            text = paragraph_text(Paragraph(node, doc)).strip()
+            match = re.match(r"^Figure (\d+)\.", text)
+            if match:
+                return int(match.group(1))
+            if text:
+                return None
+            node = node.getnext()
+        return None
 
     for p in [Paragraph(c, doc) for c in body_el.iterchildren() if c.tag == qn("w:p")]:
         blips = p._p.findall(".//" + qn("a:blip"))
         if not blips:
             continue
+        max_w, max_h = FIGURE_SIZES.get(figure_number(p), DEFAULT_FIGURE_SIZE)
         for shape in p._p.findall(".//" + qn("wp:inline")) + p._p.findall(
             ".//" + qn("wp:anchor")
         ):
@@ -587,17 +638,13 @@ def restyle(in_path: Path, out_path: Path) -> None:
             if extent is None:
                 continue
             cx, cy = int(extent.get("cx")), int(extent.get("cy"))
-            scale = TEXT_WIDTH_EMU / cx
-            new_cx, new_cy = TEXT_WIDTH_EMU, int(cy * scale)
-            max_cy = int(7.1 * 914400)
-            if new_cy > max_cy:
-                new_cx = int(new_cx * max_cy / new_cy)
-                new_cy = max_cy
-            extent.set("cx", str(int(new_cx)))
-            extent.set("cy", str(int(new_cy)))
+            scale = min(max_w * 914400 / cx, max_h * 914400 / cy)
+            new_cx, new_cy = int(cx * scale), int(cy * scale)
+            extent.set("cx", str(new_cx))
+            extent.set("cy", str(new_cy))
             for ext in shape.findall(".//" + qn("a:ext")):
-                ext.set("cx", str(int(new_cx)))
-                ext.set("cy", str(int(new_cy)))
+                ext.set("cx", str(new_cx))
+                ext.set("cy", str(new_cy))
 
     # -- 8. numbered lists -------------------------------------------------
     objectives = find_paragraph(paragraphs, lambda t: t.strip() == "Specific objectives:")
@@ -610,7 +657,7 @@ def restyle(in_path: Path, out_path: Path) -> None:
             if num_pr is None:
                 break
             set_ppr(p, align=justification(paragraph_text(p)), before=0, after=60,
-                    line=240, left=720, hanging=360, num_id=num_ids["objectives"])
+                    line=BODY_LINE, left=720, hanging=360, num_id=num_ids["objectives"])
             set_run_props(p, size=BODY_SIZE)
             node = node.getnext()
 
@@ -627,7 +674,7 @@ def restyle(in_path: Path, out_path: Path) -> None:
             continue
         p._p.remove(first)
         set_ppr(p, align=justification(paragraph_text(p)), before=0, after=60,
-                line=240, left=720, hanging=360, num_id=num_ids["workflow"])
+                line=BODY_LINE, left=720, hanging=360, num_id=num_ids["workflow"])
         set_run_props(p, size=BODY_SIZE)
 
     # 3.6 becomes numbered steps with a bold step name, like Section 2.2
@@ -656,7 +703,7 @@ def restyle(in_path: Path, out_path: Path) -> None:
         for label, rest in steps:
             step = make_paragraph(doc, [(label, True, False), (rest, False, False)],
                                   align=justification(label + rest),
-                                  before=0, after=60, line=240,
+                                  before=0, after=60, line=BODY_LINE,
                                   left=720, hanging=360, num_id=num_ids["preprocessing"])
             set_run_props(step, size=BODY_SIZE)
             for run in step._p.iter(qn("w:r")):
@@ -917,15 +964,22 @@ def restyle(in_path: Path, out_path: Path) -> None:
     # -- 16. the reference list: APA hanging indent, clickable DOIs ---------
     refs_heading = find_paragraph(all_paragraphs(), lambda t: t.strip() == "REFERENCES")
     node = refs_heading._p.getnext()
+    blank = []
     while node is not None:
         if node.tag == qn("w:p"):
             p = Paragraph(node, doc)
             if paragraph_text(p).strip():
-                set_ppr(p, align="left", before=0, after=120, line=240,
+                set_ppr(p, align="left", before=0, after=120, line=BODY_LINE,
                         left=720, hanging=720)
                 set_run_props(p, size=BODY_SIZE)
                 linkify(p)
+            else:
+                # an empty paragraph the export left at the end of the list; it
+                # now pushes the appendices down instead of ending a page
+                blank.append(node)
         node = node.getnext()
+    for node in blank:
+        node.getparent().remove(node)
 
     # -- 17. the project links move off the cover into Section 5.1 ----------
     impl = find_paragraph(all_paragraphs(),
@@ -946,6 +1000,67 @@ def restyle(in_path: Path, out_path: Path) -> None:
         impl._p.append(hyperlink_el(colab, [("Google Colab copy", False)]))
         impl._p.append(plain_run(". Both links are repeated in Appendix F.", False))
 
+    # -- 17b. Figures 7 and 8 side by side ---------------------------------
+    # Both are validation threshold charts of the same shape and are read as a
+    # pair, so a borderless two-column table puts them on one line of the page
+    # instead of filling two. Their explanations follow, in the same order.
+    layout_tables = set()
+
+    def figure_block(cap_prefix):
+        """The picture paragraph and the caption paragraph of one figure."""
+        cap = find_paragraph(all_paragraphs(),
+                             lambda t, c=cap_prefix: t.strip().startswith(c))
+        if cap is None:
+            return None, None
+        node = cap._p.getprevious()
+        while node is not None:
+            if node.tag == qn("w:p") and node.findall(".//" + qn("w:drawing")):
+                return Paragraph(node, doc), cap
+            node = node.getprevious()
+        return None, cap
+
+    pic7, cap7 = figure_block("Figure 7.")
+    pic8, cap8 = figure_block("Figure 8.")
+    if all(part is not None for part in (pic7, cap7, pic8, cap8)):
+        pair = doc.add_table(rows=2, cols=2)
+        layout_tables.add(pair._tbl)
+        pic7._p.addprevious(pair._tbl)
+
+        tbl_pr = pair._tbl.tblPr
+        for tag in ("w:tblW", "w:tblBorders", "w:tblCellMar", "w:tblLayout", "w:jc"):
+            for node in tbl_pr.findall(qn(tag)):
+                tbl_pr.remove(node)
+        tbl_pr.append(el("w:tblW", w=5000, type="pct"))
+        tbl_pr.append(el("w:tblLayout", type="fixed"))
+        borders = el("w:tblBorders")
+        for side in ("top", "left", "bottom", "right", "insideH", "insideV"):
+            borders.append(el(f"w:{side}", val="none", sz=0, space=0, color="auto"))
+        tbl_pr.append(borders)
+        margins = el("w:tblCellMar")
+        for side in ("top", "left", "bottom", "right"):
+            margins.append(el(f"w:{side}", w=0, type="dxa"))
+        tbl_pr.append(margins)
+
+        half = int(TEXT_WIDTH_EMU / 914400 * 1440 / 2)   # twips
+        for grid_col in pair._tbl.find(qn("w:tblGrid")).findall(qn("w:gridCol")):
+            grid_col.set(qn("w:w"), str(half))
+        for row in pair.rows:
+            row._tr.get_or_add_trPr().append(el("w:cantSplit"))
+        for column, (pic, cap) in enumerate(((pic7, cap7), (pic8, cap8))):
+            for row_index, source in ((0, pic), (1, cap)):
+                cell = pair.cell(row_index, column)
+                tc_pr = cell._tc.get_or_add_tcPr()
+                for node in tc_pr.findall(qn("w:tcW")):
+                    tc_pr.remove(node)
+                tc_pr.append(el("w:tcW", w=half, type="dxa"))
+                placeholder = cell.paragraphs[0]._p
+                cell._tc.append(source._p)   # lxml moves the paragraph
+                cell._tc.remove(placeholder)
+        set_ppr(cap7, align="center", before=0, after=0, line=240, keep_lines=True)
+        set_ppr(cap8, align="center", before=0, after=0, line=240, keep_lines=True)
+        set_run_props(cap7, size=CAPTION_SIZE, bold=True)
+        set_run_props(cap8, size=CAPTION_SIZE, bold=True)
+
     # -- 18. appendices -----------------------------------------------------
     import json as _json
 
@@ -963,10 +1078,11 @@ def restyle(in_path: Path, out_path: Path) -> None:
         section.addprevious(element)
         return element
 
-    def appendix_heading(text, *, page_break):
-        p = make_paragraph(doc, [text], align="left", before=240, after=120,
-                           line=240, keep_next=True, keep_lines=True,
-                           page_break=page_break)
+    def appendix_heading(text):
+        # keepNext carries the heading onto the figure and the figure onto its
+        # caption, so an appendix never opens with its heading alone
+        p = make_paragraph(doc, [text], align="left", before=320, after=120,
+                           line=240, keep_next=True, keep_lines=True)
         set_run_props(p, size=H2_SIZE, bold=False)
         emit(p._p)
         return p
@@ -1001,13 +1117,13 @@ def restyle(in_path: Path, out_path: Path) -> None:
 
     if find_paragraph(all_paragraphs(), lambda t: t.strip() == "APPENDICES") is None:
         head = make_paragraph(doc, [("APPENDICES", True, False)], align="left",
-                              before=0, after=240, line=240, keep_next=True,
-                              keep_lines=True, page_break=True)
+                              before=360, after=240, line=240, keep_next=True,
+                              keep_lines=True)
         set_run_props(head, size=H1_SIZE, bold=True)
         emit(head._p)
 
         # Appendix A ---------------------------------------------------------
-        appendix_heading("Appendix A. Threshold sweep and threshold selection", page_break=False)
+        appendix_heading("Appendix A. Threshold sweep and threshold selection")
         appendix_body(
             "Section 4.5 explains why the classifier is allowed to answer “Uncertain” "
             "instead of forcing a label, and Section 4.6 applies one threshold per predicted "
@@ -1059,8 +1175,7 @@ def restyle(in_path: Path, out_path: Path) -> None:
         )
 
         # Appendix B ---------------------------------------------------------
-        appendix_heading("Appendix B. Confusion matrix on the RealWaste test set",
-                         page_break=True)
+        appendix_heading("Appendix B. Confusion matrix on the RealWaste test set")
         appendix_figure(ROOT / "results" / "confusion_matrix.png")
         appendix_caption("Figure 12. The confusion matrix on the 464-image test set, repeated "
                          "from Figure 5 (counts, left; row-normalized, right).")
@@ -1072,8 +1187,7 @@ def restyle(in_path: Path, out_path: Path) -> None:
         )
 
         # Appendix C ---------------------------------------------------------
-        appendix_heading("Appendix C. Confusion matrix on the unseen TrashNet test set",
-                         page_break=True)
+        appendix_heading("Appendix C. Confusion matrix on the unseen TrashNet test set")
         appendix_figure(ROOT / "results" / "unseen_trashnet_confusion_matrix.png")
         appendix_caption("Figure 13. The confusion matrix on the 500-image unseen TrashNet "
                          "test set, repeated from Figure 10.")
@@ -1084,8 +1198,7 @@ def restyle(in_path: Path, out_path: Path) -> None:
         )
 
         # Appendix D ---------------------------------------------------------
-        appendix_heading("Appendix D. Recognition output of the demonstration program",
-                         page_break=True)
+        appendix_heading("Appendix D. Recognition output of the demonstration program")
         appendix_figure(ROOT / "docs" / "images" / "demo-presenter-grid.png")
         appendix_caption("Figure 14. Presenter view of the demonstration program, "
                          "captured during a user-interface check with three devices "
@@ -1107,7 +1220,7 @@ def restyle(in_path: Path, out_path: Path) -> None:
         )
 
         # Appendix E ---------------------------------------------------------
-        appendix_heading("Appendix E. System architecture diagram", page_break=True)
+        appendix_heading("Appendix E. System architecture diagram")
         appendix_figure(ROOT / "docs" / "images" / "system-architecture.png")
         appendix_caption("Figure 16. The system architecture, repeated from Figure 1: the "
                          "recognition pipeline, the live demonstration path, and the "
@@ -1119,7 +1232,7 @@ def restyle(in_path: Path, out_path: Path) -> None:
         )
 
         # Appendix F ---------------------------------------------------------
-        appendix_heading("Appendix F. Project materials", page_break=True)
+        appendix_heading("Appendix F. Project materials")
         appendix_body(
             "The notebook, the trained model, the live demonstration program, and the "
             "figures and metrics cited in this report are all published in the project "
@@ -1130,7 +1243,7 @@ def restyle(in_path: Path, out_path: Path) -> None:
                  "1Uunfl1tFrYVt09Iig5-hYnvL3mn288m5?usp=sharing")
         for label, url in [("GitHub repository: ", github),
                            ("Training and evaluation notebook (Google Colab copy): ", colab)]:
-            p = make_paragraph(doc, [], align="left", before=0, after=80, line=240,
+            p = make_paragraph(doc, [], align="left", before=0, after=80, line=BODY_LINE,
                                left=720, hanging=360, num_id="1")
             p._p.append(plain_run(label, False))
             p._p.append(hyperlink_el(url, [(url, False)]))
@@ -1143,7 +1256,10 @@ def restyle(in_path: Path, out_path: Path) -> None:
         )
 
     # -- 19. every table gets the same compact look ------------------------
+    # except the invisible one holding Figures 7 and 8, which is scaffolding
     for tbl_el in body_el.findall(qn("w:tbl")):
+        if tbl_el in layout_tables:
+            continue
         style_table(Table(tbl_el, doc))
 
     # -- 20. make the file schema-clean for Word ---------------------------
