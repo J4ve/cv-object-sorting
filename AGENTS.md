@@ -50,9 +50,10 @@ or parentheses instead. US English spelling.
 ## Report docx and PDF (docs/Midterm - Computer Vision Project Report.*)
 
 - The committed docx is produced by `scripts/restyle_report.py`, which reads the pre-restyle
-  Google Docs export and rewrites its paragraph and table properties. It is guarded so a
-  second run over its own output adds nothing, but the input of record is the docx as it
-  stood before the restyle (commit a65b549).
+  Google Docs export and rewrites its paragraph and table properties. It is a one-shot
+  migration, not a formatter: it renumbers tables and figures from their original numbers,
+  so it must run against the docx as it stood before the restyle (commit a65b549) and it
+  refuses to run on its own output.
 - Regenerate the PDF with
   `soffice -env:UserInstallation=file://<scratch>/lo_profile --headless --convert-to pdf`.
   Without the private profile a desktop LibreOffice session makes the headless convert

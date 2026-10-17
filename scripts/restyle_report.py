@@ -7,8 +7,9 @@ render the section headings wrongly). This script rewrites the paragraph and
 table properties, renumbers the tables and figures after two uncaptioned tables
 and one new chart are added, and appends the appendices.
 
-It is written to be safely re-runnable: every insertion is guarded by a check
-for the text it would add.
+This is a one-shot migration, not a formatter: the renumbering pass assumes the
+original numbering, so it must run against the docx as it stood before the
+restyle (commit a65b549). It refuses to run on its own output.
 
     python3 scripts/restyle_report.py \
         --in  "docs/Midterm - Computer Vision Project Report.docx" \
@@ -365,6 +366,11 @@ def find_paragraph(paragraphs, predicate):
 
 def restyle(in_path: Path, out_path: Path) -> None:
     doc = Document(str(in_path))
+    if any(p.text.strip() == "APPENDICES" for p in doc.paragraphs):
+        raise SystemExit(
+            f"{in_path} has already been restyled. Run this against the original "
+            "Google Docs export (the docx at commit a65b549) instead."
+        )
     num_ids = ensure_decimal_numbering(doc)
 
     from docx.table import Table
