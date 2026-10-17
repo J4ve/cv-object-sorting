@@ -67,8 +67,6 @@ or parentheses instead. US English spelling.
   export carried an invalid non-integer `w:line` spacing value, which is what made the first
   section heading render clipped in Word; and `w:sectPr` must stay the last child of the
   body, so appended content goes in with `sectPr.addprevious(...)`.
-- The docx still carries one Google Docs review comment on the title. It does not appear in
-  the PDF. Removing it is the captain's call, not a worker's.
 
 ## Maintaining this file
 

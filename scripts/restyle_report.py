@@ -514,13 +514,14 @@ def restyle(in_path: Path, out_path: Path) -> None:
     new_captions = [
         (hardware_tbl,
          "Table 2. Hardware used by the Computer Vision prototype.",
-         "The prototype needs no hardware beyond a computer and a camera. One laptop "
-         "or PC runs preprocessing and inference for every connected camera, and the "
-         "phones listed as remote camera clients only capture and send pictures."),
+         "The prototype runs on ordinary equipment. One laptop or PC does the "
+         "preprocessing and inference for every connected camera, and the phones listed "
+         "as remote camera clients only capture and send pictures."),
         (software_tbl,
          "Table 3. Software and development tools, with the versions used.",
-         "Every component is open source, and the versions listed above are the ones "
-         "used for the training run and the demonstration reported here."),
+         "These are the versions used for the training run and the demonstration "
+         "reported here. One row is not software: the RealWaste dataset is listed with "
+         "its DOI and license because the whole pipeline depends on it."),
     ]
     for anchor, cap_text, note in new_captions:
         if anchor is None or cap_text in existing:
@@ -692,8 +693,8 @@ def restyle(in_path: Path, out_path: Path) -> None:
         set_text(stale, [
             keep + " Ten of those misclassified images are shown in Figure 11 "
             "(Section 7.3), each captioned with its true class, the predicted class, and "
-            "the confidence of the wrong prediction. Screenshots of the live demonstration "
-            "recognizing items correctly are in Appendix D."
+            "the confidence of the wrong prediction. Screenshots of the demonstration "
+            "program's recognition output are in Appendix D."
         ])
         set_run_props(stale, size=BODY_SIZE)
 
@@ -723,6 +724,14 @@ def restyle(in_path: Path, out_path: Path) -> None:
 
     # -- 11. an explanation under every table and figure that lacked one ----
     explanations = [
+        ("Figure 1.",
+         "The dashed box marks the processing computer: every step of Part A happens "
+         "there, including the per-class threshold that decides between a class label "
+         "and \u201cUncertain\u201d. The phone and the relay below it only move the picture."),
+        ("Table 9.",
+         "Cardboard is the only class the model still gets right most of the time on "
+         "these images, at 78%, while Paper falls to 37% and Plastic to 39%. The "
+         "confusion matrix below shows where those errors go."),
         ("Table 1.",
          "The subset is uneven: Plastic contributes 921 images and Glass 420. The "
          "stratified split keeps each class in the same proportion inside the training, "
@@ -1071,29 +1080,31 @@ def restyle(in_path: Path, out_path: Path) -> None:
                          "test set, repeated from Figure 10.")
         appendix_body(
             "The error pattern is different from the one in Appendix B. On images from "
-            "outside RealWaste the model falls back on Cardboard for every class, most "
-            "sharply for Paper, which is the domain shift discussed in Section 6.5."
+            "outside RealWaste the model falls back on Cardboard for every other class, "
+            "most sharply for Paper, which is the domain shift discussed in Section 6.5."
         )
 
         # Appendix D ---------------------------------------------------------
-        appendix_heading("Appendix D. Sample recognition results from the live demonstration",
+        appendix_heading("Appendix D. Recognition output of the demonstration program",
                          page_break=True)
         appendix_figure(ROOT / "docs" / "images" / "demo-presenter-grid.png")
-        appendix_caption("Figure 14. Presenter view: three groupmates' phone cameras "
-                         "classified at the same time on the processing computer.")
+        appendix_caption("Figure 14. Presenter view of the demonstration program, "
+                         "captured during a user-interface check with three devices "
+                         "connected.")
         appendix_body(
-            "Each card shows one connected phone, the frame it sent, and the class and "
-            "confidence returned for it. All three items are recognized correctly, which is "
-            "the demonstration path described in Sections 5.2 and 5.3."
+            "Each card holds one connected device, the image that device sent, and the "
+            "class and confidence the model returned for it: Cardboard 83.6%, Glass 97.6% "
+            "and Metal 99.7%. This is a capture of the interface described in Sections 5.2 "
+            "and 5.3, not a record of the Midterm demonstration itself."
         )
         appendix_figure(ROOT / "docs" / "images" / "demo-uncertain.png")
-        appendix_caption("Figure 15. The reject option in the demonstration: a low-confidence "
-                         "prediction is reported as Uncertain with its best guess.")
+        appendix_caption("Figure 15. The reject option: a prediction below its threshold "
+                         "is reported as Uncertain together with the best guess.")
         appendix_body(
-            "Rather than forcing a label, the demo names the best guess and the confidence "
-            "it fell short by. This screenshot was taken while the demo still used the "
-            "single global fallback threshold of 0.60; it now compares each prediction "
-            "against that class's own threshold from Table 7."
+            "Rather than forcing a label, the program names the best guess and the "
+            "confidence it fell short by. Both captures come from an earlier build that "
+            "compared every prediction against one threshold of 0.60; the program now "
+            "compares each prediction against that class's own threshold from Table 7."
         )
 
         # Appendix E ---------------------------------------------------------
@@ -1135,6 +1146,59 @@ def restyle(in_path: Path, out_path: Path) -> None:
     # -- 19. every table gets the same compact look ------------------------
     for tbl_el in body_el.findall(qn("w:tbl")):
         style_table(Table(tbl_el, doc))
+
+    # -- 20. make the file schema-clean for Word ---------------------------
+    # Word is stricter than LibreOffice: a property element out of order, or a
+    # decimal where the schema wants an integer, can make it refuse the file.
+    # The Google Docs export shipped hundreds of cell margins like w:w="100.0",
+    # and the helpers above append properties in whatever order they run.
+    CHILD_ORDER = {
+        "pPr": ["pStyle", "keepNext", "keepLines", "pageBreakBefore", "framePr",
+                "widowControl", "numPr", "suppressLineNumbers", "pBdr", "shd", "tabs",
+                "suppressAutoHyphens", "kinsoku", "wordWrap", "overflowPunct",
+                "topLinePunct", "autoSpaceDE", "autoSpaceDN", "bidi", "adjustRightInd",
+                "snapToGrid", "spacing", "ind", "contextualSpacing", "mirrorIndents",
+                "suppressOverlap", "jc", "textDirection", "textAlignment",
+                "textboxTightWrap", "outlineLvl", "divId", "cnfStyle", "rPr", "sectPr",
+                "pPrChange"],
+        "rPr": ["rStyle", "rFonts", "b", "bCs", "i", "iCs", "caps", "smallCaps", "strike",
+                "dstrike", "outline", "shadow", "emboss", "imprint", "noProof",
+                "snapToGrid", "vanish", "webHidden", "color", "spacing", "w", "kern",
+                "position", "sz", "szCs", "highlight", "u", "effect", "bdr", "shd",
+                "fitText", "vertAlign", "rtl", "cs", "em", "lang", "eastAsianLayout",
+                "specVanish", "oMath", "rPrChange"],
+        "tblPr": ["tblStyle", "tblpPr", "tblOverlap", "bidiVisual", "tblStyleRowBandSize",
+                  "tblStyleColBandSize", "tblW", "jc", "tblCellSpacing", "tblInd",
+                  "tblBorders", "shd", "tblLayout", "tblCellMar", "tblLook", "tblCaption",
+                  "tblDescription", "tblPrChange"],
+        "tcPr": ["cnfStyle", "tcW", "gridSpan", "hMerge", "vMerge", "tcBorders", "shd",
+                 "noWrap", "tcMar", "textDirection", "tcFitText", "vAlign", "hideMark",
+                 "headers", "cellIns", "cellDel", "cellMerge", "tcPrChange"],
+        "trPr": ["cnfStyle", "divId", "gridBefore", "gridAfter", "wBefore", "wAfter",
+                 "cantSplit", "trHeight", "tblHeader", "tblCellSpacing", "jc", "hidden",
+                 "ins", "del", "trPrChange"],
+    }
+
+    decimal_value = re.compile(r"^-?\d+\.\d+$")
+
+    def normalize(root):
+        for element in root.iter():
+            for name, value in list(element.attrib.items()):
+                if decimal_value.match(value or ""):
+                    element.set(name, str(int(round(float(value)))))
+            tag = element.tag.split("}")[1]
+            order = CHILD_ORDER.get(tag)
+            if not order:
+                continue
+            children = list(element)
+            index = {name: i for i, name in enumerate(order)}
+            children.sort(key=lambda c: index.get(c.tag.split("}")[1], len(order)))
+            for child in children:
+                element.append(child)
+
+    normalize(doc.element)
+    normalize(doc.part.numbering_part.element)
+    normalize(doc.styles.element)
 
     doc.save(str(out_path))
 
