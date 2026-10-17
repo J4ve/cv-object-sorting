@@ -2,13 +2,13 @@
 
 ## Source
 
-[RealWaste](https://doi.org/10.24432/C5SS4G) — UC Irvine Machine Learning Repository, 2023
+[RealWaste](https://doi.org/10.24432/C5SS4G), UC Irvine Machine Learning Repository, 2023
 (CC BY 4.0). Single, S., Iranmanesh, S., & Raad, R. (2023). *RealWaste: A novel real-life
 data set for landfill waste classification using deep learning.* Information, 14(12), Article 633.
 https://doi.org/10.3390/info14120633
 
 4,752 photographs of waste items taken at the point of reception at a landfill in Wollongong,
-Australia, across 9 original material classes. Images are not committed to this repository —
+Australia, across 9 original material classes. Images are not committed to this repository.
 `src/training/Midterm_Object_Sorting_RealWaste.ipynb` downloads the dataset zip directly from
 UCI (`https://archive.ics.uci.edu/static/public/908/realwaste.zip`) at run time.
 
@@ -43,11 +43,11 @@ paths before augmentation so no validation/test image is used in training.
 Per-class counts are in `src/training/Midterm_Object_Sorting_RealWaste.ipynb` (Step 3) and the
 project report (`docs/`, Table 1 / Section 3.5).
 
-- **Training set** — used to fit the CNN's weights.
-- **Validation set** — used for early stopping / learning-rate reduction during training; not
+- **Training set:** used to fit the CNN's weights.
+- **Validation set:** used for early stopping and learning-rate reduction during training, not
   used to update weights directly.
-- **Testing set** — held out and evaluated once at the end (Step 6 of the notebook) to report
-  accuracy, precision/recall/F1 and the confusion matrix.
+- **Testing set:** held out and evaluated once at the end (Step 6 of the notebook) to report
+  accuracy, precision/recall/F1, and the confusion matrix.
 
 ## Preprocessing
 
