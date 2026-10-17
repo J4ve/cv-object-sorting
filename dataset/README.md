@@ -41,7 +41,9 @@ paths before augmentation so no validation/test image is used in training.
 | **Total** | **3,092** | 100% |
 
 Per-class counts are in `src/training/Midterm_Object_Sorting_RealWaste.ipynb` (Step 3) and the
-project report (`docs/`, Table 1 / Section 3.5).
+project report (`docs/`, Table 1 / Section 3.5). The exact file-level assignment (which image
+went to which split) is recorded in [`split.csv`](split.csv), so the evaluation in Step 6 can be
+re-run against the identical test set without recomputing the split.
 
 - **Training set:** used to fit the CNN's weights.
 - **Validation set:** used for early stopping and learning-rate reduction during training, not

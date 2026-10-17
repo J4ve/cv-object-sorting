@@ -1,0 +1,113 @@
+{
+  "classes": [
+    "Cardboard",
+    "Glass",
+    "Metal",
+    "Paper",
+    "Plastic"
+  ],
+  "images_per_class": {
+    "Cardboard": 461,
+    "Glass": 420,
+    "Metal": 790,
+    "Paper": 500,
+    "Plastic": 921
+  },
+  "split": {
+    "train": 2164,
+    "val": 464,
+    "test": 464
+  },
+  "test_accuracy": 0.8793,
+  "macro_f1": 0.878,
+  "per_class_f1": {
+    "Cardboard": 0.8676,
+    "Glass": 0.8682,
+    "Metal": 0.8936,
+    "Paper": 0.8875,
+    "Plastic": 0.8731
+  },
+  "confusion_matrix": [
+    [
+      59,
+      0,
+      1,
+      7,
+      2
+    ],
+    [
+      1,
+      56,
+      2,
+      2,
+      2
+    ],
+    [
+      1,
+      1,
+      105,
+      3,
+      9
+    ],
+    [
+      3,
+      1,
+      0,
+      71,
+      0
+    ],
+    [
+      3,
+      8,
+      8,
+      2,
+      117
+    ]
+  ],
+  "classification_report": {
+    "Cardboard": {
+      "precision": 0.8805970149253731,
+      "recall": 0.855072463768116,
+      "f1-score": 0.8676470588235294,
+      "support": 69.0
+    },
+    "Glass": {
+      "precision": 0.8484848484848485,
+      "recall": 0.8888888888888888,
+      "f1-score": 0.8682170542635659,
+      "support": 63.0
+    },
+    "Metal": {
+      "precision": 0.9051724137931034,
+      "recall": 0.8823529411764706,
+      "f1-score": 0.8936170212765957,
+      "support": 119.0
+    },
+    "Paper": {
+      "precision": 0.8352941176470589,
+      "recall": 0.9466666666666667,
+      "f1-score": 0.8875,
+      "support": 75.0
+    },
+    "Plastic": {
+      "precision": 0.9,
+      "recall": 0.8478260869565217,
+      "f1-score": 0.8731343283582089,
+      "support": 138.0
+    },
+    "accuracy": 0.8793103448275862,
+    "macro avg": {
+      "precision": 0.8739096789700769,
+      "recall": 0.8841614094913328,
+      "f1-score": 0.8780230925443799,
+      "support": 464.0
+    },
+    "weighted avg": {
+      "precision": 0.8809877490286743,
+      "recall": 0.8793103448275862,
+      "f1-score": 0.8792258282818445,
+      "support": 464.0
+    }
+  },
+  "weighted_f1": 0.8792
+}
