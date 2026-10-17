@@ -79,7 +79,7 @@ def set_ppr(
     page_break=False,
     num_id=None,
     ilvl=0,
-    keep_lines=True,
+    keep_lines=False,
 ):
     """Replace a paragraph's properties wholesale with clean, valid ones."""
     old = p._p.find(qn("w:pPr"))
@@ -90,12 +90,12 @@ def set_ppr(
         rpr = None
 
     ppr = el("w:pPr")
-    if page_break:
-        ppr.append(el("w:pageBreakBefore"))
     if keep_next:
         ppr.append(el("w:keepNext"))
     if keep_lines:
         ppr.append(el("w:keepLines"))
+    if page_break:
+        ppr.append(el("w:pageBreakBefore"))
     if num_id is not None:
         npr = el("w:numPr")
         npr.append(el("w:ilvl", val=ilvl))
@@ -227,7 +227,7 @@ def ensure_decimal_numbering(doc) -> str:
         lvl.append(el("w:lvlText", val="%%%d." % (level + 1)))
         lvl.append(el("w:lvlJc", val="left"))
         ppr = el("w:pPr")
-        ppr.append(el("w:ind", left=457200 + level * 457200, hanging=342900))
+        ppr.append(el("w:ind", left=720 + level * 720, hanging=540))
         lvl.append(ppr)
         abstract.append(lvl)
 
@@ -265,6 +265,7 @@ def caption(doc, text: str, **kwargs):
         before=0,
         after=160,
         keep_next=True,
+        keep_lines=True,
         **kwargs,
     )
 
@@ -364,19 +365,26 @@ def restyle(in_path: Path, out_path: Path) -> None:
         set_ppr(p, align="center", before=0, after=0, line=240)
 
     cover = [p for p in cover if p._p.getparent() is not None]
-    spacing = {
-        "A Computer Vision Project Report": (0, 1000),
-        "MIDTERM PROJECT REPORT": (0, 640),
-        "Submitted as a requirement for the course\nComputer Vision": (0, 1100),
-        "Group Project Specialization": (0, 0),
-        "Object Sorting": (0, 1300),
-        "Prepared by:": (0, 120),
-        "BS Computer Science – 4A": (0, 1300),
-        "Submitted to:": (0, 120),
-    }
+    # Vertical rhythm of the cover, in twips, keyed by the start of each line.
+    # The whole block must fit on page 1, which it did not before.
+    spacing = [
+        ("A Computer Vision Project Report", 1250, 1250),
+        ("MIDTERM PROJECT REPORT", 0, 950),
+        ("Submitted as a requirement", 0, 1350),
+        ("Group Project Specialization", 0, 0),
+        ("Object Sorting", 0, 1500),
+        ("Prepared by:", 0, 160),
+        ("Alba, John Raymond S.", 0, 260),
+        ("BS Computer Science", 0, 1500),
+        ("Submitted to:", 0, 160),
+    ]
     for p in cover:
         text = paragraph_text(p).strip()
-        before, after = spacing.get(text, (0, 120))
+        before, after = 0, 120
+        for prefix, b, a in spacing:
+            if text.startswith(prefix):
+                before, after = b, a
+                break
         set_ppr(p, align="center", before=before, after=after, line=240)
     title = find_paragraph(cover, lambda t: t.strip() == "MIDTERM PROJECT REPORT")
     if title is not None:
@@ -389,13 +397,15 @@ def restyle(in_path: Path, out_path: Path) -> None:
             continue
         if H1_RE.match(text) or text == "REFERENCES":
             set_ppr(p, align="left", before=0, after=240, line=240,
-                    keep_next=True, page_break=True)
+                    keep_next=True, keep_lines=True, page_break=True)
             set_run_props(p, size=H1_SIZE, bold=True)
         elif H2_RE.match(text):
-            set_ppr(p, align="left", before=240, after=80, line=240, keep_next=True)
+            set_ppr(p, align="left", before=240, after=80, line=240,
+                    keep_next=True, keep_lines=True)
             set_run_props(p, size=H2_SIZE, bold=False)
         elif re.match(r"^(Table|Figure) \d+\.", text):
-            set_ppr(p, align="center", before=0, after=200, line=240, keep_next=True)
+            set_ppr(p, align="center", before=0, after=200, line=240,
+                    keep_next=True, keep_lines=True)
             set_run_props(p, size=CAPTION_SIZE, bold=True)
         elif text in {"General objective:", "Specific objectives:"}:
             set_ppr(p, align="left", before=120, after=60, line=240, keep_next=True)
@@ -406,12 +416,654 @@ def restyle(in_path: Path, out_path: Path) -> None:
             if has_num:
                 num_id = num_pr.find(qn("w:numPr")).find(qn("w:numId")).get(qn("w:val"))
                 set_ppr(p, align="both", before=0, after=60, line=240,
-                        left=457200, hanging=228600, num_id=num_id)
+                        left=720, hanging=360, num_id=num_id)
             elif p._p.findall(".//" + qn("w:drawing")):
                 set_ppr(p, align="center", before=120, after=60, line=240, keep_next=True)
             else:
                 set_ppr(p, align="both", before=0, after=140, line=240)
             set_run_props(p, size=BODY_SIZE)
+
+    # -- 3. renumber the in-text table and figure references ---------------
+    # Two uncaptioned tables gain captions and one chart is added, so the
+    # numbering shifts. Every replacement keeps the same string length, so the
+    # characters go straight back into the runs they came from.
+    table_ref = re.compile(r"\bTable (\d+)\b")
+    figure_ref = re.compile(r"\bFigure (\d+)\b")
+    for p in paragraphs[cover_end:]:
+        text = paragraph_text(p)
+        if re.match(r"^\s*(Table|Figure) \d+\.", text):
+            continue  # captions are rewritten below, not patched
+        replace_same_length(p, table_ref,
+                            lambda m: f"Table {TABLE_MAP.get(int(m.group(1)), int(m.group(1)))}")
+        replace_same_length(p, figure_ref,
+                            lambda m: f"Figure {FIGURE_MAP.get(int(m.group(1)), int(m.group(1)))}")
+    for table in tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    replace_same_length(p, table_ref,
+                                        lambda m: f"Table {TABLE_MAP.get(int(m.group(1)), int(m.group(1)))}")
+
+    # -- 4. rewrite the captions with their new numbers --------------------
+    def set_text(p, parts):
+        for child in list(p._p):
+            if child.tag != qn("w:pPr"):
+                p._p.remove(child)
+        for part in parts:
+            text, bold, italic = (part if isinstance(part, tuple) else (part, False, False))
+            run = p.add_run(text)
+            run.bold = bold
+            run.italic = italic
+
+    for p in paragraphs[cover_end:]:
+        text = paragraph_text(p).strip()
+        m = re.match(r"^(Table|Figure) (\d+)\.(.*)$", text, re.S)
+        if not m:
+            continue
+        kind, number, rest = m.group(1), int(m.group(2)), m.group(3)
+        mapping = TABLE_MAP if kind == "Table" else FIGURE_MAP
+        set_text(p, [(f"{kind} {mapping.get(number, number)}.{rest}", True, False)])
+        set_run_props(p, size=CAPTION_SIZE, bold=True)
+
+    # -- 5. caption the two tables that had none ---------------------------
+    def table_after(heading_text):
+        """The first table following the given heading."""
+        node = find_paragraph(paragraphs, lambda t: t.strip().startswith(heading_text))._p
+        while node is not None:
+            node = node.getnext()
+            if node is not None and node.tag == qn("w:tbl"):
+                return node
+        return None
+
+    existing = {paragraph_text(p).strip() for p in paragraphs}
+    hardware_tbl = table_after("2.3 Hardware Components")
+    software_tbl = table_after("2.4 Software and Development Tools")
+
+    new_captions = [
+        (hardware_tbl,
+         "Table 2. Hardware used by the Computer Vision prototype.",
+         "The prototype needs no hardware beyond a computer and a camera. One laptop "
+         "or PC runs preprocessing and inference for every connected camera, and the "
+         "phones listed as remote camera clients only capture and send pictures."),
+        (software_tbl,
+         "Table 3. Software and development tools, with the versions used.",
+         "Every component is open source, and the versions listed above are the ones "
+         "used for the training run and the demonstration reported here."),
+    ]
+    for anchor, cap_text, note in new_captions:
+        if anchor is None or cap_text in existing:
+            continue
+        cap = caption(doc, cap_text)
+        note_p = body(doc, [note])
+        insert_after(anchor, cap, note_p)
+
+    # -- 6. figures: real architecture diagram, text-width sizing ----------
+    def figure_paragraph_before(caption_prefix):
+        cap = find_paragraph(paragraphs, lambda t: t.strip().startswith(caption_prefix))
+        if cap is None:
+            return None
+        node = cap._p.getprevious()
+        while node is not None:
+            if node.tag == qn("w:p") and node.findall(".//" + qn("w:drawing")):
+                return Paragraph(node, doc)
+            node = node.getprevious()
+        return None
+
+    arch_p = figure_paragraph_before("Figure 1.")
+    arch_png = ROOT / "docs" / "images" / "system-architecture.png"
+    if arch_p is not None and arch_png.exists():
+        for child in list(arch_p._p):
+            if child.tag != qn("w:pPr"):
+                arch_p._p.remove(child)
+        arch_p.add_run().add_picture(str(arch_png), width=TEXT_WIDTH_EMU)
+        set_ppr(arch_p, align="center", before=120, after=60, keep_next=True)
+
+    # -- 7. the dataset distribution chart, generated by the notebook ------
+    dist_png = ROOT / "results" / "dataset_distribution.png"
+    dist_caption = "Figure 2. Images per class in the selected RealWaste subset, split into training, validation and testing sets."
+    anchor = find_paragraph(
+        paragraphs, lambda t: t.startswith("The selected 5-class subset is imbalanced")
+    )
+    if anchor is not None and dist_png.exists() and dist_caption not in {
+        paragraph_text(p).strip() for p in paragraphs
+    }:
+        pic = Paragraph(el("w:p"), doc)
+        pic.add_run().add_picture(str(dist_png), width=TEXT_WIDTH_EMU)
+        set_ppr(pic, align="center", before=120, after=60, keep_next=True)
+        cap = caption(doc, dist_caption)
+        note = body(doc, [
+            "Plastic is the largest class with 921 images and Glass the smallest with 420, "
+            "about 2.2 times fewer. The stratified split keeps that same proportion inside "
+            "each of the three sets, so the imbalance is spread evenly across training, "
+            "validation and testing rather than concentrated in one of them."
+        ])
+        insert_after(anchor._p, pic, cap, note)
+
+    # every remaining figure is scaled to the text width, capped so that the
+    # figure and its caption still fit on one page
+    from PIL import Image as _Image
+
+    for p in [Paragraph(c, doc) for c in body_el.iterchildren() if c.tag == qn("w:p")]:
+        blips = p._p.findall(".//" + qn("a:blip"))
+        if not blips:
+            continue
+        for shape in p._p.findall(".//" + qn("wp:inline")) + p._p.findall(
+            ".//" + qn("wp:anchor")
+        ):
+            extent = shape.find(qn("wp:extent"))
+            if extent is None:
+                continue
+            cx, cy = int(extent.get("cx")), int(extent.get("cy"))
+            scale = TEXT_WIDTH_EMU / cx
+            new_cx, new_cy = TEXT_WIDTH_EMU, int(cy * scale)
+            max_cy = int(7.1 * 914400)
+            if new_cy > max_cy:
+                new_cx = int(new_cx * max_cy / new_cy)
+                new_cy = max_cy
+            extent.set("cx", str(int(new_cx)))
+            extent.set("cy", str(int(new_cy)))
+            for ext in shape.findall(".//" + qn("a:ext")):
+                ext.set("cx", str(int(new_cx)))
+                ext.set("cy", str(int(new_cy)))
+
+    # -- 8. numbered lists -------------------------------------------------
+    objectives = find_paragraph(paragraphs, lambda t: t.strip() == "Specific objectives:")
+    if objectives is not None:
+        node = objectives._p.getnext()
+        while node is not None and node.tag == qn("w:p"):
+            p = Paragraph(node, doc)
+            ppr = p._p.find(qn("w:pPr"))
+            num_pr = ppr.find(qn("w:numPr")) if ppr is not None else None
+            if num_pr is None:
+                break
+            set_ppr(p, align="both", before=0, after=60, line=240,
+                    left=720, hanging=540, num_id=decimal_num)
+            set_run_props(p, size=BODY_SIZE)
+            node = node.getnext()
+
+    # 3.6 becomes numbered steps with a bold step name, like Section 2.2
+    prep = find_paragraph(
+        paragraphs, lambda t: t.startswith("Images are decoded as RGB with tf.io.decode_image")
+    )
+    if prep is not None:
+        steps = [
+            ("Decoding.",
+             " Images are decoded as RGB with tf.io.decode_image."),
+            ("Resizing.",
+             " Every image is resized to 224×224 with antialiasing (tf.image.resize)."),
+            ("Rescaling.",
+             " Pixel values are kept as float32 in the notebook's data pipeline; the "
+             "rescaling to the [-1, 1] range MobileNetV2 expects is performed inside the "
+             "model itself (a Rescaling(1/127.5, offset=-1) layer), so the same raw-pixel "
+             "input works for both training and the recognize() demo function."),
+            ("Augmentation (training set only).",
+             " Random horizontal and vertical flip, rotation (±15%), zoom (±15%), "
+             "brightness (±20%) and contrast (±20%) are applied to the training set "
+             "only, so the model sees more lighting and viewing-angle variation without "
+             "changing the validation and testing data used for evaluation."),
+        ]
+        anchor_el = prep._p
+        new_steps = []
+        for label, rest in steps:
+            step = make_paragraph(doc, [(label, True, False), (rest, False, False)],
+                                  align="both", before=0, after=60, line=240,
+                                  left=720, hanging=540, num_id=decimal_num)
+            set_run_props(step, size=BODY_SIZE)
+            for run in step._p.iter(qn("w:r")):
+                pass
+            new_steps.append(step)
+        # keep the bold label bold, body text regular
+        for step, (label, _rest) in zip(new_steps, steps):
+            runs = step._p.findall(qn("w:r"))
+            set_run_props(Paragraph(step._p, doc), size=BODY_SIZE)
+            rpr = runs[0].find(qn("w:rPr"))
+            for tag in ("w:b", "w:bCs"):
+                for node in rpr.findall(qn(tag)):
+                    rpr.remove(node)
+                rpr.append(el(tag, val="1"))
+        insert_after(anchor_el, *new_steps)
+        anchor_el.getparent().remove(anchor_el)
+
+    # -- 9. small accuracy fixes --------------------------------------------
+    all_paragraphs = lambda: [Paragraph(c, doc) for c in body_el.iterchildren()
+                              if c.tag == qn("w:p")]
+
+    # The 500-image unseen set has 100 images per class, not 20; the header was
+    # left over from the earlier 100-image set.
+    for table in tables:
+        for cell in table.rows[0].cells:
+            if cell.text.strip() == "Accuracy (correct/20)":
+                set_text(cell.paragraphs[0], [("Accuracy (correct / 100)", True, False)])
+
+    # Section 6.4 claimed no misclassified examples were available; Figure 11 shows ten.
+    stale = find_paragraph(all_paragraphs(), lambda t: "only aggregate counts were available" in t)
+    if stale is not None:
+        text = paragraph_text(stale)
+        keep = text.split("Individual misclassified example images")[0].rstrip()
+        set_text(stale, [
+            keep + " Ten of those misclassified images are shown in Figure 11 "
+            "(Section 7.3), each captioned with its true class, the predicted class, and "
+            "the confidence of the wrong prediction. Screenshots of the live demonstration "
+            "recognizing items correctly are in Appendix D."
+        ])
+        set_run_props(stale, size=BODY_SIZE)
+
+    # "Training set (2,164 images). used to ..." -> sentence case after the period
+    for p in all_paragraphs():
+        text = paragraph_text(p)
+        m = re.match(r"^((?:Training|Validation|Testing) set \([\d,]+ images\)\. )([a-z])", text)
+        if m:
+            replace_same_length(p, re.compile(re.escape(m.group(0))),
+                                lambda mm: m.group(1) + m.group(2).upper())
+
+    # -- 10. move each figure's explanation below its caption ---------------
+    moves = [
+        ("ROC AUC (Figure 6) summarizes", "Figure 6."),
+        ("Figure 7 shows the validation data behind", "Figure 7."),
+        ("The global fallback threshold (0.59) was selected this way", "Figure 8."),
+        ("Expected Calibration Error on the test set", "Figure 9."),
+        ("Figure 11 shows ten misclassified test images", "Figure 11."),
+    ]
+    for lead, cap_prefix in moves:
+        src = find_paragraph(all_paragraphs(), lambda t, l=lead: t.strip().startswith(l))
+        cap = find_paragraph(all_paragraphs(), lambda t, c=cap_prefix: t.strip().startswith(c))
+        if src is None or cap is None:
+            continue
+        src._p.getparent().remove(src._p)
+        cap._p.addnext(src._p)
+
+    # -- 11. an explanation under every table and figure that lacked one ----
+    explanations = [
+        ("Table 1.",
+         "The subset is uneven: Plastic contributes 921 images and Glass 420. The "
+         "stratified split keeps each class in the same proportion inside the training, "
+         "validation and testing sets, so no split is made easier or harder than the "
+         "others by the imbalance."),
+        ("Table 4.",
+         "The five classes are the RealWaste categories a sorting robot would have to "
+         "separate, and every one of them is far above the Midterm minimum of 100 images: "
+         "the smallest, Glass, has 420."),
+        ("Figure 3.",
+         "The samples show why the task is not trivial. Items appear crushed, torn, dirty "
+         "or partly transparent, and several classes share the same muted colors and "
+         "textures, which is the visual similarity described in Section 1.2."),
+        ("Figure 4.",
+         "Each augmented copy is the same training image under a different flip, rotation, "
+         "zoom, brightness or contrast, so the model sees more lighting and viewing-angle "
+         "variation than the dataset itself contains. The validation and testing images are "
+         "left untouched."),
+    ]
+    existing_text = {paragraph_text(p).strip() for p in all_paragraphs()}
+    for cap_prefix, note in explanations:
+        if note in existing_text:
+            continue
+        cap = find_paragraph(all_paragraphs(), lambda t, c=cap_prefix: t.strip().startswith(c))
+        if cap is None:
+            continue
+        note_p = body(doc, [note])
+        cap._p.addnext(note_p._p)
+
+    # a lead-in between the configuration table and the threshold table
+    lead_text = ("The confidence threshold in the last row is not a single number: each "
+                 "class has its own, listed below.")
+    if lead_text not in existing_text:
+        cap = find_paragraph(all_paragraphs(), lambda t: t.strip().startswith("Table 6."))
+        if cap is not None:
+            cap._p.addnext(body(doc, [lead_text])._p)
+
+    # -- 12. break the threshold rationale into readable paragraphs ---------
+    long_p = find_paragraph(all_paragraphs(), lambda t: t.startswith("A reject option, allowing"))
+    if long_p is not None:
+        full = paragraph_text(long_p)
+        marks = ["Per-class confidence thresholds were then selected",
+                 "Calibration mattered for interpreting these thresholds"]
+        cuts = [0] + [full.index(m) for m in marks if m in full] + [len(full)]
+        chunks = [full[cuts[i]:cuts[i + 1]].strip() for i in range(len(cuts) - 1)]
+        chunks[-1] += (" The validation sweep and the selection rule behind these "
+                       "thresholds are reproduced in Appendix A.")
+        set_text(long_p, [chunks[0]])
+        set_run_props(long_p, size=BODY_SIZE)
+        anchor = long_p._p
+        for chunk in chunks[1:]:
+            p = body(doc, [chunk])
+            set_run_props(p, size=BODY_SIZE)
+            anchor.addnext(p._p)
+            anchor = p._p
+
+    # -- 13. appendix pointers in the body ----------------------------------
+    pointers = [
+        ("The live demonstration extends Part A with remote camera input",
+         " A full-page version of Figure 1 is in Appendix E."),
+        ("Most common mistakes (true class misread as predicted class",
+         " A full-page version of this confusion matrix is in Appendix B."),
+        ("The drop from 87.93% to 56.00% is domain shift",
+         " A full-page version of this confusion matrix is in Appendix C."),
+    ]
+    for prefix, extra in pointers:
+        p = find_paragraph(all_paragraphs(), lambda t, pre=prefix: t.strip().startswith(pre))
+        if p is None or extra.strip() in paragraph_text(p):
+            continue
+        run = p.add_run(extra)
+        set_run_props(p, size=BODY_SIZE)
+
+    # -- 14. Section 9.2: bold only the label of the first recommendation ---
+    rec = find_paragraph(all_paragraphs(),
+                         lambda t: t.strip().startswith("Close the generalization gap"))
+    if rec is not None:
+        text = paragraph_text(rec).strip()
+        head, _, tail = text.partition(".")
+        set_text(rec, [(head + ".", True, False), (" " + tail.strip(), False, False)])
+        set_run_props(rec, size=BODY_SIZE)
+        for run in rec._p.findall(qn("w:r"))[1:]:
+            rpr = run.find(qn("w:rPr"))
+            for tag in ("w:b", "w:bCs"):
+                for node in rpr.findall(qn(tag)):
+                    rpr.remove(node)
+                rpr.append(el(tag, val="0"))
+
+    # -- 15. clickable URLs ------------------------------------------------
+    from docx.opc.constants import RELATIONSHIP_TYPE as RT
+
+    url_re = re.compile(r"https?://[^\s)\]]+")
+
+    def hyperlink_el(url, segments):
+        """A w:hyperlink wrapping runs built from (text, italic) segments."""
+        rid = doc.part.relate_to(url, RT.HYPERLINK, is_external=True)
+        link = el("w:hyperlink")
+        link.set(qn("r:id"), rid)
+        for text, italic in segments:
+            run = el("w:r")
+            rpr = el("w:rPr")
+            rpr.append(el("w:color", val="0563C1"))
+            rpr.append(el("w:u", val="single"))
+            if italic:
+                rpr.append(el("w:i", val="1"))
+                rpr.append(el("w:iCs", val="1"))
+            rpr.append(el("w:sz", val=BODY_SIZE))
+            rpr.append(el("w:szCs", val=BODY_SIZE))
+            run.append(rpr)
+            t = el("w:t")
+            t.set(qn("xml:space"), "preserve")
+            t.text = text
+            run.append(t)
+            link.append(run)
+        return link
+
+    def plain_run(text, italic, size=BODY_SIZE):
+        run = el("w:r")
+        rpr = el("w:rPr")
+        if italic:
+            rpr.append(el("w:i", val="1"))
+            rpr.append(el("w:iCs", val="1"))
+        rpr.append(el("w:sz", val=size))
+        rpr.append(el("w:szCs", val=size))
+        run.append(rpr)
+        t = el("w:t")
+        t.set(qn("xml:space"), "preserve")
+        t.text = text
+        run.append(t)
+        return run
+
+    def linkify(p):
+        """Turn every URL into a hyperlink, keeping the italics already there."""
+        chars = []
+        for run in p._p.findall(qn("w:r")):
+            rpr = run.find(qn("w:rPr"))
+            italic = rpr is not None and rpr.find(qn("w:i")) is not None and \
+                rpr.find(qn("w:i")).get(qn("w:val"), "1") not in ("0", "false")
+            for t in run.findall(qn("w:t")):
+                for ch in (t.text or ""):
+                    chars.append((ch, italic))
+        text = "".join(c for c, _ in chars)
+        spans = [(m.start(), m.end()) for m in url_re.finditer(text)]
+        spans = [(s, e - 1 if text[e - 1] in ".," else e) for s, e in spans]
+        if not spans:
+            return False
+        for child in list(p._p):
+            if child.tag != qn("w:pPr"):
+                p._p.remove(child)
+
+        def emit(lo, hi, url=None):
+            segments, start = [], lo
+            for i in range(lo, hi + 1):
+                if i == hi or chars[i][1] != chars[start][1]:
+                    segments.append((text[start:i], chars[start][1]))
+                    start = i
+            if url:
+                p._p.append(hyperlink_el(url, segments))
+            else:
+                for seg_text, italic in segments:
+                    p._p.append(plain_run(seg_text, italic))
+
+        cursor = 0
+        for start, end in spans:
+            if start > cursor:
+                emit(cursor, start)
+            emit(start, end, url=text[start:end])
+            cursor = end
+        if cursor < len(text):
+            emit(cursor, len(text))
+        return True
+
+    # -- 16. the reference list: APA hanging indent, clickable DOIs ---------
+    refs_heading = find_paragraph(all_paragraphs(), lambda t: t.strip() == "REFERENCES")
+    node = refs_heading._p.getnext()
+    while node is not None:
+        if node.tag == qn("w:p"):
+            p = Paragraph(node, doc)
+            if paragraph_text(p).strip():
+                set_ppr(p, align="left", before=0, after=120, line=240,
+                        left=720, hanging=720)
+                set_run_props(p, size=BODY_SIZE)
+                linkify(p)
+        node = node.getnext()
+
+    # -- 17. the project links move off the cover into Section 5.1 ----------
+    impl = find_paragraph(all_paragraphs(),
+                          lambda t: t.startswith("The demonstration pipeline is implemented"))
+    if impl is not None and "Appendix F" not in paragraph_text(impl):
+        text = paragraph_text(impl)
+        github = "https://github.com/J4ve/cv-object-sorting"
+        colab = ("https://colab.research.google.com/drive/"
+                 "1Uunfl1tFrYVt09Iig5-hYnvL3mn288m5?usp=sharing")
+        head, _, tail = text.partition(github)
+        for child in list(impl._p):
+            if child.tag != qn("w:pPr"):
+                impl._p.remove(child)
+        impl._p.append(plain_run(head, False))
+        impl._p.append(hyperlink_el(github, [(github, False)]))
+        impl._p.append(plain_run(tail, False))
+        impl._p.append(plain_run(" The notebook can also be opened directly as a ", False))
+        impl._p.append(hyperlink_el(colab, [("Google Colab copy", False)]))
+        impl._p.append(plain_run(". Both links are repeated in Appendix F.", False))
+
+    # -- 18. appendices -----------------------------------------------------
+    import json as _json
+
+    def load(name):
+        return _json.loads((ROOT / "results" / name).read_text())
+
+    sweep = load("threshold_sweep.json")
+    selection = load("threshold_selection.json")
+
+    def appendix_heading(text, *, page_break):
+        p = make_paragraph(doc, [text], align="left", before=240, after=120,
+                           line=240, keep_next=True, keep_lines=True,
+                           page_break=page_break)
+        set_run_props(p, size=H2_SIZE, bold=False)
+        body_el.append(p._p)
+        return p
+
+    def appendix_body(text):
+        p = body(doc, [text])
+        set_run_props(p, size=BODY_SIZE)
+        body_el.append(p._p)
+        return p
+
+    def appendix_caption(text):
+        p = caption(doc, text)
+        body_el.append(p._p)
+        return p
+
+    def appendix_figure(image_path: Path):
+        p = Paragraph(el("w:p"), doc)
+        p.add_run().add_picture(str(image_path), width=TEXT_WIDTH_EMU)
+        set_ppr(p, align="center", before=120, after=60, keep_next=True)
+        body_el.append(p._p)
+        return p
+
+    def appendix_table(rows):
+        table = doc.add_table(rows=len(rows), cols=len(rows[0]))
+        for r, row in enumerate(rows):
+            for c, value in enumerate(row):
+                cell = table.cell(r, c)
+                cell.text = ""
+                set_text(cell.paragraphs[0], [str(value)])
+        return table
+
+    if find_paragraph(all_paragraphs(), lambda t: t.strip() == "APPENDICES") is None:
+        head = make_paragraph(doc, [("APPENDICES", True, False)], align="left",
+                              before=0, after=240, line=240, keep_next=True,
+                              keep_lines=True, page_break=True)
+        set_run_props(head, size=H1_SIZE, bold=True)
+        body_el.append(head._p)
+
+        # Appendix A ---------------------------------------------------------
+        appendix_heading("Appendix A. Threshold sweep and threshold selection", page_break=False)
+        appendix_body(
+            "Section 4.5 explains why the classifier is allowed to answer “Uncertain” "
+            "instead of forcing a label, and Section 4.6 applies one threshold per predicted "
+            "class. The two tables below are the validation evidence behind those numbers."
+        )
+        rows = [["Threshold", "Coverage", "Accuracy on covered predictions",
+                 "Wrong predictions caught"]]
+        for row in sweep["validation_sweep"]:
+            rows.append([
+                f"{row['threshold']:.2f}",
+                f"{row['coverage'] * 100:.2f}%",
+                f"{row['accuracy_on_covered'] * 100:.2f}%",
+                f"{row['pct_wrong_caught_as_uncertain'] * 100:.2f}%",
+            ])
+        appendix_table(rows)
+        appendix_caption("Table 10. Confidence threshold sweep on the 464-image validation "
+                         "set, the data plotted in Figure 7.")
+        appendix_body(
+            "Raising the threshold buys accuracy with coverage. At 0.40 the classifier "
+            "answers for almost every image but is right on 86.40% of them; at 0.90 it "
+            "answers for 59.48% and is right on 98.55% of those. The thresholds in Table 7 "
+            "sit in between, where most images still get an answer."
+        )
+
+        chosen = selection["chosen_threshold"]
+        val_row = selection["validation_row_at_chosen_t"]
+        test_row = selection["test_row_at_chosen_t"]
+        appendix_table([
+            ["Measure", "Value"],
+            ["Selection rule", selection["selection_rule"]],
+            ["Chosen global fallback threshold", f"{chosen:.2f}"],
+            ["Validation coverage at that threshold", f"{val_row['coverage'] * 100:.2f}%"],
+            ["Validation accuracy on covered predictions",
+             f"{val_row['selective_accuracy'] * 100:.2f}%"],
+            ["Test coverage at that threshold", f"{test_row['coverage'] * 100:.2f}%"],
+            ["Test accuracy on covered predictions",
+             f"{test_row['accuracy_on_covered'] * 100:.2f}%"],
+            ["Test errors caught as Uncertain",
+             f"{test_row['n_errors_caught']} of {test_row['n_errors_total']}"],
+        ])
+        appendix_caption("Table 11. The global fallback threshold, chosen on the validation "
+                         "set and then applied once to the test set.")
+        appendix_body(
+            "The fallback threshold is used only for a class with too few validation "
+            "predictions to estimate its own threshold reliably (Section 4.5). Applied to "
+            "the test set it keeps 87.72% of the predictions and is right on 93.37% of "
+            "them, catching 29 of the 56 test errors instead of reporting them as "
+            "confident answers."
+        )
+
+        # Appendix B ---------------------------------------------------------
+        appendix_heading("Appendix B. Confusion matrix on the RealWaste test set",
+                         page_break=True)
+        appendix_figure(ROOT / "results" / "confusion_matrix.png")
+        appendix_caption("Figure 12. Full-page version of Figure 5: the confusion matrix on "
+                         "the 464-image test set (counts, left; row-normalized, right).")
+        appendix_body(
+            "The diagonal holds the correct predictions. The off-diagonal cells show that "
+            "the mistakes cluster on visually similar materials rather than spreading "
+            "evenly: Metal read as Plastic, Plastic read as Glass or Metal, and Cardboard "
+            "read as Paper."
+        )
+
+        # Appendix C ---------------------------------------------------------
+        appendix_heading("Appendix C. Confusion matrix on the unseen TrashNet test set",
+                         page_break=True)
+        appendix_figure(ROOT / "results" / "unseen_trashnet_confusion_matrix.png")
+        appendix_caption("Figure 13. Full-page version of Figure 10: the confusion matrix on "
+                         "the 500-image unseen TrashNet test set.")
+        appendix_body(
+            "The error pattern is different from the one in Appendix B. On images from "
+            "outside RealWaste the model falls back on Cardboard for every class, most "
+            "sharply for Paper, which is the domain shift discussed in Section 6.5."
+        )
+
+        # Appendix D ---------------------------------------------------------
+        appendix_heading("Appendix D. Sample recognition results from the live demonstration",
+                         page_break=True)
+        appendix_figure(ROOT / "docs" / "images" / "demo-presenter-grid.png")
+        appendix_caption("Figure 14. Presenter view: three groupmates' phone cameras "
+                         "classified at the same time on the processing computer.")
+        appendix_body(
+            "Each card shows one connected phone, the frame it sent, and the class and "
+            "confidence returned for it. All three items are recognized correctly, which is "
+            "the demonstration path described in Sections 5.2 and 5.3."
+        )
+        appendix_figure(ROOT / "docs" / "images" / "demo-uncertain.png")
+        appendix_caption("Figure 15. The reject option in the demonstration: a low-confidence "
+                         "prediction is reported as Uncertain with its best guess.")
+        appendix_body(
+            "Rather than forcing a label, the demo names the best guess and the confidence "
+            "it fell short by. This screenshot was taken while the demo still used the "
+            "single global fallback threshold of 0.60; it now compares each prediction "
+            "against that class's own threshold from Table 7."
+        )
+
+        # Appendix E ---------------------------------------------------------
+        appendix_heading("Appendix E. System architecture diagram", page_break=True)
+        appendix_figure(ROOT / "docs" / "images" / "system-architecture.png")
+        appendix_caption("Figure 16. Full-page version of Figure 1: the recognition pipeline, "
+                         "the live demonstration path, and the offline training pipeline.")
+        appendix_body(
+            "Part A is what happens to one image at demonstration time and Part B is the "
+            "offline run that produced the model it uses. Every step of Part A runs on the "
+            "processing computer: a connected phone and the relay only move the picture."
+        )
+
+        # Appendix F ---------------------------------------------------------
+        appendix_heading("Appendix F. Project materials", page_break=True)
+        appendix_body(
+            "The notebook, the trained model, the live demonstration program, and the "
+            "figures and metrics cited in this report are all published in the project "
+            "repository."
+        )
+        github = "https://github.com/J4ve/cv-object-sorting"
+        colab = ("https://colab.research.google.com/drive/"
+                 "1Uunfl1tFrYVt09Iig5-hYnvL3mn288m5?usp=sharing")
+        for label, url in [("GitHub repository: ", github),
+                           ("Training and evaluation notebook (Google Colab copy): ", colab)]:
+            p = make_paragraph(doc, [], align="left", before=0, after=80, line=240,
+                               left=720, hanging=360, num_id="1")
+            p._p.append(plain_run(label, False))
+            p._p.append(hyperlink_el(url, [(url, False)]))
+            body_el.append(p._p)
+        appendix_body(
+            "Inside the repository, the notebook is "
+            "src/training/Midterm_Object_Sorting_RealWaste.ipynb, the trained model is "
+            "models/waste_classifier.keras, and the metrics and figures cited here are in "
+            "results/."
+        )
+
+    # -- 19. every table gets the same compact look ------------------------
+    for tbl_el in body_el.findall(qn("w:tbl")):
+        style_table(Table(tbl_el, doc))
 
     doc.save(str(out_path))
 
