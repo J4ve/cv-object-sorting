@@ -807,7 +807,19 @@ def restyle(in_path: Path, out_path: Path) -> None:
     # -- 15. clickable URLs ------------------------------------------------
     from docx.opc.constants import RELATIONSHIP_TYPE as RT
 
-    url_re = re.compile(r"https?://[^\s)\]]+")
+    url_re = re.compile(r"https?://\S+")
+
+    def url_end(text, start, end):
+        """Trim trailing sentence punctuation, and a closing bracket we never opened."""
+        while end > start:
+            last = text[end - 1]
+            if last in ".,;:":
+                end -= 1
+            elif last == ")" and text.count(")", start, end) > text.count("(", start, end):
+                end -= 1
+            else:
+                break
+        return end
 
     def hyperlink_el(url, segments):
         """A w:hyperlink wrapping runs built from (text, italic) segments."""
@@ -858,8 +870,8 @@ def restyle(in_path: Path, out_path: Path) -> None:
                 for ch in (t.text or ""):
                     chars.append((ch, italic))
         text = "".join(c for c, _ in chars)
-        spans = [(m.start(), m.end()) for m in url_re.finditer(text)]
-        spans = [(s, e - 1 if text[e - 1] in ".," else e) for s, e in spans]
+        spans = [(m.start(), url_end(text, m.start(), m.end()))
+                 for m in url_re.finditer(text)]
         if not spans:
             return False
         for child in list(p._p):
@@ -1011,7 +1023,7 @@ def restyle(in_path: Path, out_path: Path) -> None:
         test_row = selection["test_row_at_chosen_t"]
         appendix_table([
             ["Measure", "Value"],
-            ["Selection rule", selection["selection_rule"]],
+            ["Selection rule", selection["selection_rule"].replace(">=", "\u2265")],
             ["Chosen global fallback threshold", f"{chosen:.2f}"],
             ["Validation coverage at that threshold", f"{val_row['coverage'] * 100:.2f}%"],
             ["Validation accuracy on covered predictions",
