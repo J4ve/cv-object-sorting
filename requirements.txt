@@ -1,0 +1,22 @@
+# Pinned dependencies for training (src/training/), the notebook (src/training/*.ipynb),
+# and the local demo (src/vision/). Python 3.12 (see .python-version).
+#
+# CPU by default: plain tensorflow runs MobileNetV2 training on ~3k images in well
+# under an hour on a modern CPU, with no system CUDA install needed.
+#
+# Optional GPU: if you have an NVIDIA GPU and want faster training, install
+# "tensorflow[and-cuda]==2.21.0" instead (adds several GB of bundled CUDA/cuDNN
+# wheels, no system CUDA required either way). Verify GPU visibility with:
+#   python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
+
+tensorflow==2.21.0
+pandas>=2.2
+scikit-learn>=1.5
+opencv-python-headless>=4.10
+matplotlib>=3.9
+pillow>=10.4
+gradio>=4.44
+
+# Notebook / exploration
+jupyter==1.0.0
+ipykernel==6.29.5

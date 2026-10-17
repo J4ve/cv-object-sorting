@@ -2,6 +2,8 @@
 dataset/raw_data/
 dataset/*.zip
 dataset/images/
+data/
+*.zip
 *.jpg
 *.jpeg
 *.png
@@ -11,6 +13,7 @@ dataset/images/
 !demonstration/**/*.jpg
 !results/**/*.png
 !results/**/*.jpg
+!src/vision/samples/**
 
 # Model weights (keep under ~50MB if committed; otherwise link externally in models/README.md)
 *.h5

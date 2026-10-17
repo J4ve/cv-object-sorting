@@ -30,14 +30,22 @@ is reported as "Uncertain" rather than forced into a class.
 
 ## Model file / access
 
-**Not yet populated.** The report (`docs/`) cites 87.93% test accuracy, from a separate local
-run of this same pipeline whose weights file (`waste_classifier.keras`) has not been placed in
-this repository yet. A different notebook run saved to a Colab session (88.15% test accuracy,
-not the number in the report) was also never exported from Colab. No trained weights are
-committed here yet; they will be added once the live demo (`src/vision/README.md`) retrains
-and exports the model that matches the report's numbers.
+`waste_classifier.keras` and `class_names.json` are committed in this folder, produced by
+`src/training/train_export.py` (a local reproduction of
+`src/training/Midterm_Object_Sorting_RealWaste.ipynb`'s exact pipeline). See
+`results/results.json` for the reproduced test accuracy, macro F1, and confusion matrix from
+that run.
 
-## Loading the model (once weights are added)
+If the weights are missing or you want to retrain, regenerate them with:
+
+```bash
+python src/training/train_export.py
+```
+
+This downloads the RealWaste dataset into a gitignored `data/` folder and writes both files
+here plus `results/results.json`.
+
+## Loading the model
 
 ```python
 from tensorflow import keras
@@ -46,3 +54,9 @@ model = keras.models.load_model('models/waste_classifier.keras')
 
 Preprocess inputs exactly as in the notebook (RGB, resize to 224x224, float32; rescaling to
 [-1, 1] is baked into the model) and index predictions against the class list above.
+
+## Size note
+
+The MobileNetV2-based `.keras` export is in the ~10-25 MB range, well under GitHub's limits,
+so it is committed directly. If a future retrain produces a file over ~90 MB, keep it out of
+git (add a `*.keras` exclusion override) and note the external location here instead.
