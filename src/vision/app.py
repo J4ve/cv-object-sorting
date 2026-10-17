@@ -87,6 +87,16 @@ def _card_html(image: Image.Image, title: str, result: dict | None, error: str |
     thumb = _thumb_data_uri(image)
     if error:
         body = f'<p style="color:#b91c1c; font-size:1.1em;">Could not classify this image: {error}</p>'
+    elif result["is_uncertain"]:
+        color = CLASS_COLORS["Uncertain"]
+        body = (
+            f'<p style="margin:4px 0 0 0; font-weight:800; font-size:3.4em; line-height:1.1; color:{color};">'
+            f'Uncertain'
+            f'<span style="font-size:0.28em; font-weight:400; color:#6b7280;"> ({result["latency_ms"]:.0f} ms)</span></p>'
+            f'<p style="margin:0 0 8px 0; font-weight:600; font-size:1.3em; color:{color};">'
+            f'best guess: {result["raw_label"]} {result["confidence"] * 100:.1f}% (below 60%)</p>'
+            f"{_bars_html(result['probabilities'])}"
+        )
     else:
         color = CLASS_COLORS.get(result["label"], "#334155")
         body = (

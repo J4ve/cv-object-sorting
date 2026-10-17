@@ -117,20 +117,32 @@ def _bars_html(probabilities: dict, top_n: int = 3) -> str:
     return "".join(rows)
 
 
+def _label_bits(result: dict) -> tuple[str, str, str]:
+    """Returns (color, main_text, sub_text) for a result. When confident, sub_text
+    is empty; when uncertain, main_text is "Uncertain" and sub_text names the
+    top class anyway so the display is never just a bare, unexplained "Uncertain"."""
+    if result["label"] == "Waiting...":
+        return "#9ca3af", "Waiting...", ""
+    if result["is_uncertain"]:
+        sub = f'best guess: {result["raw_label"]} {result["confidence"] * 100:.1f}% (below 60%)'
+        return "#d97706", "Uncertain", sub
+    return "#15803d", f'{result["label"]} · {result["confidence"] * 100:.1f}%', ""
+
+
 def _own_card_html(name: str, result: dict) -> str:
-    color = "#d97706" if result["is_uncertain"] else "#15803d"
+    color, main, sub = _label_bits(result)
     name = html.escape(name)
+    sub_html = f' <span style="color:{color};">({sub.replace(" (below 60%)", ", below 60%")})</span>' if sub else ""
     return (
         f'<p style="margin:4px 0; font-size:1.1em;">{name}: '
-        f'<strong style="color:{color};">{result["label"]}</strong> '
-        f'&middot; {result["confidence"] * 100:.1f}% '
+        f'<strong style="color:{color};">{main}</strong>{sub_html} '
         f'<span style="color:#6b7280;">({result["latency_ms"]:.0f} ms)</span></p>'
     )
 
 
 def _large_card_html(name: str, device: dict) -> str:
     result = device["result"]
-    color = "#d97706" if result["is_uncertain"] else "#15803d"
+    color, main, sub = _label_bits(result)
     name = html.escape(name)
     if device.get("image") is None:
         img_html = (
@@ -152,8 +164,9 @@ def _large_card_html(name: str, device: dict) -> str:
       <div style="flex:1 1 320px; min-width:260px;">
         <p style="margin:0 0 2px 0; font-size:1em; color:#6b7280;">{name}</p>
         <p style="margin:0 0 10px 0; font-size:1.8em; font-weight:700; color:{color}; line-height:1.15;">
-          {result["label"]} &middot; {result["confidence"] * 100:.1f}%
+          {main}
           <span style="color:#6b7280; font-weight:400; font-size:0.45em; display:block;">({result["latency_ms"]:.0f} ms)</span>
+          {f'<span style="font-size:0.5em; font-weight:600; display:block; margin-top:4px;">{sub}</span>' if sub else ''}
         </p>
         {_bars_html(result["probabilities"])}
       </div>
@@ -167,7 +180,7 @@ def _grid_html(devices: dict) -> str:
     cards = []
     for name, device in sorted(devices.items()):
         result = device["result"]
-        color = "#d97706" if result["is_uncertain"] else "#15803d"
+        color, main, sub = _label_bits(result)
         safe_name = html.escape(name)
         if device.get("image") is None:
             thumb_html = (
@@ -186,8 +199,9 @@ def _grid_html(devices: dict) -> str:
               </div>
               <p style="margin:8px 0 2px 0; font-size:1em; color:#6b7280; word-break:break-all;">{safe_name}</p>
               <p style="margin:0; font-weight:700; font-size:1.4em; color:{color};">
-                {result["label"]} &middot; {result["confidence"] * 100:.1f}%
+                {main}
               </p>
+              {f'<p style="margin:2px 0 0 0; font-weight:600; font-size:0.8em; color:{color};">{sub}</p>' if sub else ''}
             </div>
             """
         )
