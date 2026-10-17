@@ -1,0 +1,37 @@
+# Dataset images (keep dataset/README.md documentation only; link to source instead)
+dataset/raw_data/
+dataset/*.zip
+dataset/images/
+*.jpg
+*.jpeg
+*.png
+*.bmp
+!docs/**/*.png
+!demonstration/**/*.png
+!demonstration/**/*.jpg
+!results/**/*.png
+!results/**/*.jpg
+
+# Model weights (keep under ~50MB if committed; otherwise link externally in models/README.md)
+*.h5
+*.keras
+*.pt
+*.pth
+*.onnx
+*.tflite
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+*.egg-info/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
