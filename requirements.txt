@@ -1,8 +1,0 @@
-# Midterm Computer Vision pipeline (src/training/) — versions as used/printed in the notebook.
-# src/vision/ (live demo) will add its own serving dependencies separately.
-tensorflow==2.21.0
-opencv-python
-numpy
-pandas
-matplotlib
-scikit-learn
