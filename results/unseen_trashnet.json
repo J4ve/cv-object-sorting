@@ -1,0 +1,65 @@
+{
+  "n_images": 500,
+  "source": "TrashNet (Thung & Yang, 2016), 100 images per class",
+  "overall_accuracy": 0.56,
+  "per_class_accuracy": {
+    "Cardboard": 0.78,
+    "Glass": 0.6,
+    "Metal": 0.66,
+    "Paper": 0.37,
+    "Plastic": 0.39
+  },
+  "per_class_precision": {
+    "Cardboard": 0.3594,
+    "Glass": 0.6186,
+    "Metal": 0.7253,
+    "Paper": 0.74,
+    "Plastic": 0.8667
+  },
+  "per_class_f1": {
+    "Cardboard": 0.4921,
+    "Glass": 0.6091,
+    "Metal": 0.6911,
+    "Paper": 0.4933,
+    "Plastic": 0.5379
+  },
+  "confusion_matrix": [
+    [
+      78,
+      1,
+      11,
+      9,
+      1
+    ],
+    [
+      28,
+      60,
+      7,
+      1,
+      4
+    ],
+    [
+      23,
+      8,
+      66,
+      2,
+      1
+    ],
+    [
+      63,
+      0,
+      0,
+      37,
+      0
+    ],
+    [
+      25,
+      28,
+      7,
+      1,
+      39
+    ]
+  ],
+  "uncertain_rate_per_class_thresholds": 0.166,
+  "n_uncertain_per_class_thresholds": 83
+}
