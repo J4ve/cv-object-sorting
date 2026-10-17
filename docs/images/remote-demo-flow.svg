@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" role="img" aria-label="Flow diagram: groupmate phone to Caddy on VPS to reverse SSH tunnel to Gradio app on presenter laptop">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#555555"></path>
+    </marker>
+  </defs>
+
+  <rect x="10" y="10" width="740" height="280" fill="#ffffff" stroke="#dddddd"></rect>
+
+  <rect x="30" y="110" width="140" height="80" rx="8" fill="#eef4ff" stroke="#3366aa"></rect>
+  <text x="100" y="140" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#222222">Groupmate's</text>
+  <text x="100" y="158" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#222222">phone</text>
+
+  <rect x="230" y="60" width="160" height="80" rx="8" fill="#eefbea" stroke="#339944"></rect>
+  <text x="310" y="90" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#222222">Caddy on VPS</text>
+  <text x="310" y="108" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#444444">(port 443, HTTPS)</text>
+
+  <rect x="230" y="170" width="160" height="80" rx="8" fill="#fff6e0" stroke="#cc9922"></rect>
+  <text x="310" y="200" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#222222">127.0.0.1:&lt;remote-port&gt;</text>
+  <text x="310" y="218" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#444444">on the VPS</text>
+
+  <rect x="460" y="170" width="160" height="80" rx="8" fill="#fff6e0" stroke="#cc9922"></rect>
+  <text x="540" y="200" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#222222">127.0.0.1:7860</text>
+  <text x="540" y="218" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#444444">on presenter's laptop</text>
+
+  <rect x="600" y="60" width="140" height="80" rx="8" fill="#f3eaff" stroke="#8844cc"></rect>
+  <text x="670" y="90" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#222222">Gradio app</text>
+  <text x="670" y="108" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#444444">(camera dropdown)</text>
+
+  <line x1="170" y1="150" x2="230" y2="100" stroke="#555555" stroke-width="2" marker-end="url(#arrow)"></line>
+  <text x="195" y="115" font-family="sans-serif" font-size="12" fill="#333333">HTTPS</text>
+
+  <line x1="310" y1="140" x2="310" y2="170" stroke="#555555" stroke-width="2" marker-end="url(#arrow)"></line>
+
+  <line x1="390" y1="210" x2="460" y2="210" stroke="#555555" stroke-width="2" marker-end="url(#arrow)" marker-start="url(#arrow)"></line>
+  <text x="425" y="198" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#333333">reverse</text>
+  <text x="425" y="238" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#333333">SSH tunnel</text>
+
+  <line x1="540" y1="170" x2="540" y2="140" stroke="#555555" stroke-width="2" marker-end="url(#arrow)"></line>
+</svg>

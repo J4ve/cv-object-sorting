@@ -30,6 +30,7 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from src.vision.classifier import CONF_THRESH, WasteClassifier  # noqa: E402
+from src.vision.remote import build_phone_tab, build_presenter_tab  # noqa: E402
 
 HOST = "127.0.0.1"
 PORT = 7860
@@ -197,6 +198,12 @@ with gr.Blocks(title="Waste Classifier (RealWaste, Midterm demo)", analytics_ena
         cam_input = gr.Image(sources=["webcam"], streaming=True, type="pil", label="Live webcam")
         cam_out = gr.HTML()
         cam_input.stream(classify_stream, inputs=cam_input, outputs=cam_out, stream_every=0.2)
+
+    with gr.Tab("Phone camera"):
+        build_phone_tab(classifier)
+
+    with gr.Tab("Presenter"):
+        build_presenter_tab(classifier)
 
 
 if __name__ == "__main__":

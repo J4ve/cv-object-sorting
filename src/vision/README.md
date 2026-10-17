@@ -57,6 +57,13 @@ crashing the server.
 
 Stop the server with Ctrl+C.
 
+## Remote / phone demo
+
+The **Phone camera** and **Presenter** tabs let groupmates join from their
+own phones over a public tunnel during a screen-shared presentation. See
+[`docs/remote-demo.md`](../../docs/remote-demo.md) for how to start the
+tunnel, the URL to share, and how to stop it.
+
 ## Sample images
 
 `src/vision/samples/` has one small (resized to 512px max side) example image
