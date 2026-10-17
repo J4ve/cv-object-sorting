@@ -75,6 +75,28 @@ it automatically if the connection dropped (keepalives +
 `ExitOnForwardFailure=yes` so a dead tunnel fails fast and retries,
 instead of hanging silently).
 
+## Tuning the live frame rate
+
+The Phone camera stream interval and the Presenter refresh interval are
+configurable via environment variables, in case the venue's network or the
+presenter's CPU needs a different budget than the defaults:
+
+| Variable | Default | What it controls |
+|---|---|---|
+| `PHONE_STREAM_INTERVAL_S` | `0.2` (~5 fps) | Minimum seconds between frames a phone sends up. Lower = smoother but more CPU/network load. |
+| `PRESENTER_REFRESH_S` | `0.2` | How often the Presenter tab's dropdown and display re-render. |
+
+Example, for a slower connection:
+
+```bash
+PHONE_STREAM_INTERVAL_S=0.5 PRESENTER_REFRESH_S=0.5 python src/vision/app.py
+```
+
+A single in-memory lock ensures only one frame is classified at a time
+across all connected phones; if a new frame arrives while the previous one
+is still being classified, it is dropped rather than queued, so the demo
+stays responsive instead of building up a backlog under load.
+
 ## Security notes
 
 - While the tunnel was open, the URL was reachable by **anyone on the

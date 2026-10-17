@@ -13,19 +13,28 @@ more than ``DEVICE_TTL_S`` are dropped automatically.
 import base64
 import html
 import io
+import os
+import sys
 import threading
 import time
 
 import gradio as gr
 from PIL import Image
 
+
+def _log(msg: str) -> None:
+    print(f"[remote] {msg}", file=sys.stderr, flush=True)
+
 DEVICE_TTL_S = 30.0  # devices idle longer than this are dropped from the registry
-MAX_FRAME_SIDE = 320  # phone frames are downscaled to this many px on the long side
-PHONE_STREAM_INTERVAL_S = 0.6  # ~1.6 frames/sec, within the spec's 1-2/sec budget
-PRESENTER_REFRESH_S = 0.7  # presenter dropdown + display refresh interval
+MAX_FRAME_SIDE = 480  # phone frames are downscaled to this many px on the long side
+# ~5 fps by default; override with env vars if the network/CPU needs a different budget.
+PHONE_STREAM_INTERVAL_S = float(os.environ.get("PHONE_STREAM_INTERVAL_S", "0.2"))
+PRESENTER_REFRESH_S = float(os.environ.get("PRESENTER_REFRESH_S", "0.2"))
+JPEG_QUALITY = 75
 
 _lock = threading.Lock()
 _devices: dict[str, dict] = {}
+_infer_busy = threading.Lock()  # held during a single classification; new frames are skipped while held
 
 
 def _downscale(image: Image.Image, max_side: int = MAX_FRAME_SIDE) -> Image.Image:
@@ -34,7 +43,7 @@ def _downscale(image: Image.Image, max_side: int = MAX_FRAME_SIDE) -> Image.Imag
     return img.convert("RGB")
 
 
-def _data_uri(image: Image.Image, quality: int = 70) -> str:
+def _data_uri(image: Image.Image, quality: int = JPEG_QUALITY) -> str:
     buf = io.BytesIO()
     image.save(buf, format="JPEG", quality=quality)
     b64 = base64.b64encode(buf.getvalue()).decode("ascii")
@@ -52,6 +61,25 @@ def _register_frame(name: str, image: Image.Image, result: dict) -> None:
             "result": result,
             "last_seen": time.monotonic(),
         }
+    _log(f"_register_frame: name={name!r} size={image.size} label={result['label']!r}")
+
+
+_PLACEHOLDER_RESULT = {
+    "label": "Waiting...",
+    "confidence": 0.0,
+    "probabilities": {},
+    "is_uncertain": True,
+    "latency_ms": 0.0,
+}
+
+
+def _register_join(name: str) -> None:
+    """Puts a placeholder entry in the registry as soon as someone joins, so their
+    name shows in the Presenter dropdown even before their first frame arrives."""
+    with _lock:
+        if name not in _devices:
+            _devices[name] = {"image": None, "result": dict(_PLACEHOLDER_RESULT), "last_seen": time.monotonic()}
+    _log(f"_register_join: name={name!r}")
 
 
 def _prune_stale() -> None:
@@ -104,14 +132,22 @@ def _large_card_html(name: str, device: dict) -> str:
     result = device["result"]
     color = "#d97706" if result["is_uncertain"] else "#15803d"
     name = html.escape(name)
-    thumb = _data_uri(_downscale(device["image"], max_side=480))
+    if device.get("image") is None:
+        img_html = (
+            '<div style="width:100%; aspect-ratio:4/3; border-radius:10px; background:#f3f4f6; '
+            'display:flex; align-items:center; justify-content:center; color:#9ca3af; '
+            'font-size:1.3em;">Waiting for a photo...</div>'
+        )
+    else:
+        thumb = _data_uri(_downscale(device["image"], max_side=960))
+        img_html = f'<img src="{thumb}" style="width:100%; max-height:70vh; object-fit:contain; border-radius:10px;"/>'
     return f"""
-    <div>
-      <img src="{thumb}" style="max-width:100%; border-radius:10px;"/>
-      <p style="margin:10px 0 2px 0; font-size:0.9em; color:#6b7280;">{name}</p>
-      <p style="margin:0 0 6px 0; font-size:1.3em; font-weight:600; color:{color};">
+    <div style="width:100%;">
+      {img_html}
+      <p style="margin:10px 0 2px 0; font-size:1em; color:#6b7280;">{name}</p>
+      <p style="margin:0 0 6px 0; font-size:2em; font-weight:700; color:{color};">
         {result["label"]} &middot; {result["confidence"] * 100:.1f}%
-        <span style="color:#6b7280; font-weight:400; font-size:0.8em;">({result["latency_ms"]:.0f} ms)</span>
+        <span style="color:#6b7280; font-weight:400; font-size:0.5em;">({result["latency_ms"]:.0f} ms)</span>
       </p>
       {_bars_html(result["probabilities"])}
     </div>
@@ -125,20 +161,28 @@ def _grid_html(devices: dict) -> str:
     for name, device in sorted(devices.items()):
         result = device["result"]
         color = "#d97706" if result["is_uncertain"] else "#15803d"
-        thumb = _data_uri(_downscale(device["image"], max_side=220))
         safe_name = html.escape(name)
+        if device.get("image") is None:
+            thumb_html = (
+                '<div style="width:100%; aspect-ratio:4/3; border-radius:8px; '
+                'background:#f3f4f6; display:flex; align-items:center; justify-content:center; '
+                'color:#9ca3af; font-size:1.1em;">Waiting for a photo...</div>'
+            )
+        else:
+            thumb = _data_uri(_downscale(device["image"], max_side=640))
+            thumb_html = f'<img src="{thumb}" style="width:100%; border-radius:8px;"/>'
         cards.append(
             f"""
-            <div style="width:220px; border:1px solid #e5e7eb; border-radius:8px; padding:8px;">
-              <img src="{thumb}" style="width:100%; border-radius:6px;"/>
-              <p style="margin:6px 0 2px 0; font-size:0.85em; color:#6b7280; word-break:break-all;">{safe_name}</p>
-              <p style="margin:0; font-weight:600; color:{color};">
+            <div style="flex:1 1 46%; min-width:280px; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
+              {thumb_html}
+              <p style="margin:8px 0 2px 0; font-size:1em; color:#6b7280; word-break:break-all;">{safe_name}</p>
+              <p style="margin:0; font-weight:700; font-size:1.4em; color:{color};">
                 {result["label"]} &middot; {result["confidence"] * 100:.1f}%
               </p>
             </div>
             """
         )
-    return f'<div style="display:flex; flex-wrap:wrap; gap:10px;">{"".join(cards)}</div>'
+    return f'<div style="display:flex; flex-wrap:wrap; gap:14px;">{"".join(cards)}</div>'
 
 
 def build_phone_tab(classifier) -> None:
@@ -158,31 +202,67 @@ def build_phone_tab(classifier) -> None:
         sources=["webcam"],
         streaming=True,
         type="pil",
-        label="Point at an object",
+        label="Point at an object (live stream)",
         visible=False,
     )
+    gr.Markdown(
+        "If the live stream above doesn't start (common on some phone browsers "
+        "through the proxy), use this instead:",
+        visible=True,
+    )
+    upload = gr.Image(sources=["upload", "webcam"], type="pil", label="Or take / upload a photo", visible=False)
+    send_btn = gr.Button("Send photo", visible=False)
     result_out = gr.HTML()
 
     def join(name):
         name = (name or "").strip()
         if not name:
-            return gr.update(), "", gr.update(visible=False), "<p style='color:#b91c1c;'>Enter a name first.</p>"
-        return gr.update(value=name, interactive=False), name, gr.update(visible=True), ""
+            return gr.update(), "", gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), ""
+        _register_join(name)
+        _log(f"join: name={name!r}")
+        return (
+            gr.update(value=name, interactive=False),
+            name,
+            gr.update(visible=True),
+            gr.update(visible=True),
+            gr.update(visible=True),
+            "",
+        )
 
-    join_btn.click(join, inputs=name_box, outputs=[name_box, name_state, cam, result_out])
+    join_btn.click(join, inputs=name_box, outputs=[name_box, name_state, cam, upload, send_btn, result_out])
 
-    def on_frame(frame, name):
+    def _classify_and_register(frame, name, label):
         if frame is None or not name:
             return gr.skip()
         small = _downscale(frame)
+        if not _infer_busy.acquire(blocking=False):
+            _log(f"{label}: busy, dropping frame for name={name!r}")
+            return gr.skip()
         try:
+            buf = io.BytesIO()
+            small.save(buf, format="JPEG", quality=85)
+            frame_bytes = buf.tell()
             result = classifier.predict(small)
-        except Exception:
+        except Exception as exc:
+            _log(f"{label}: predict failed name={name!r} err={exc!r}")
             return "<p style='color:#b91c1c;'>Could not read this camera frame.</p>"
+        finally:
+            _infer_busy.release()
+        _log(
+            f"{label}: name={name!r} frame_size={small.size} frame_bytes={frame_bytes} "
+            f"classify_ms={result['latency_ms']:.1f} label={result['label']!r}"
+        )
         _register_frame(name, small, result)
         return _own_card_html(name, result)
 
+    def on_frame(frame, name):
+        return _classify_and_register(frame, name, "on_frame")
+
+    def on_send(frame, name):
+        return _classify_and_register(frame, name, "on_send")
+
     cam.stream(on_frame, inputs=[cam, name_state], outputs=result_out, stream_every=PHONE_STREAM_INTERVAL_S)
+    send_btn.click(on_send, inputs=[upload, name_state], outputs=result_out)
 
 
 def build_presenter_tab(classifier) -> None:
