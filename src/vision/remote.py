@@ -25,7 +25,7 @@ from PIL import Image
 def _log(msg: str) -> None:
     print(f"[remote] {msg}", file=sys.stderr, flush=True)
 
-DEVICE_TTL_S = 30.0  # devices idle longer than this are dropped from the registry
+DEVICE_TTL_S = float(os.environ.get("DEVICE_TTL_S", "30"))  # devices idle longer than this are dropped
 MAX_FRAME_SIDE = 480  # phone frames are downscaled to this many px on the long side
 # ~5 fps by default; override with env vars if the network/CPU needs a different budget.
 PHONE_STREAM_INTERVAL_S = float(os.environ.get("PHONE_STREAM_INTERVAL_S", "0.2"))
@@ -117,39 +117,59 @@ def _bars_html(probabilities: dict, top_n: int = 3) -> str:
     return "".join(rows)
 
 
+def _label_bits(result: dict) -> tuple[str, str, str]:
+    """Returns (color, main_text, sub_text) for a result. When confident, sub_text
+    is empty; when uncertain, main_text is "Uncertain" and sub_text names the
+    top class anyway so the display is never just a bare, unexplained "Uncertain"."""
+    if result["label"] == "Waiting...":
+        return "#9ca3af", "Waiting...", ""
+    if result["is_uncertain"]:
+        sub = f'best guess: {result["raw_label"]} {result["confidence"] * 100:.1f}% (below 60%)'
+        return "#d97706", "Uncertain", sub
+    return "#15803d", f'{result["label"]} · {result["confidence"] * 100:.1f}%', ""
+
+
 def _own_card_html(name: str, result: dict) -> str:
-    color = "#d97706" if result["is_uncertain"] else "#15803d"
+    color, main, sub = _label_bits(result)
     name = html.escape(name)
+    sub_html = f' <span style="color:{color};">({sub.replace(" (below 60%)", ", below 60%")})</span>' if sub else ""
     return (
         f'<p style="margin:4px 0; font-size:1.1em;">{name}: '
-        f'<strong style="color:{color};">{result["label"]}</strong> '
-        f'&middot; {result["confidence"] * 100:.1f}% '
+        f'<strong style="color:{color};">{main}</strong>{sub_html} '
         f'<span style="color:#6b7280;">({result["latency_ms"]:.0f} ms)</span></p>'
     )
 
 
 def _large_card_html(name: str, device: dict) -> str:
     result = device["result"]
-    color = "#d97706" if result["is_uncertain"] else "#15803d"
+    color, main, sub = _label_bits(result)
     name = html.escape(name)
     if device.get("image") is None:
         img_html = (
-            '<div style="width:100%; aspect-ratio:4/3; border-radius:10px; background:#f3f4f6; '
+            '<div style="width:100%; max-height:58vh; aspect-ratio:4/3; border-radius:10px; background:#f3f4f6; '
             'display:flex; align-items:center; justify-content:center; color:#9ca3af; '
             'font-size:1.3em;">Waiting for a photo...</div>'
         )
     else:
         thumb = _data_uri(_downscale(device["image"], max_side=960))
-        img_html = f'<img src="{thumb}" style="width:100%; max-height:70vh; object-fit:contain; border-radius:10px;"/>'
+        img_html = (
+            f'<img src="{thumb}" style="max-width:100%; max-height:58vh; width:auto; height:auto; '
+            f'object-fit:contain; border-radius:10px; display:block;"/>'
+        )
     return f"""
-    <div style="width:100%;">
-      {img_html}
-      <p style="margin:10px 0 2px 0; font-size:1em; color:#6b7280;">{name}</p>
-      <p style="margin:0 0 6px 0; font-size:2em; font-weight:700; color:{color};">
-        {result["label"]} &middot; {result["confidence"] * 100:.1f}%
-        <span style="color:#6b7280; font-weight:400; font-size:0.5em;">({result["latency_ms"]:.0f} ms)</span>
-      </p>
-      {_bars_html(result["probabilities"])}
+    <div style="display:flex; flex-wrap:wrap; gap:24px; align-items:flex-start; width:100%;">
+      <div style="flex:1 1 55%; min-width:280px; max-height:58vh; display:flex; align-items:center; justify-content:center;">
+        {img_html}
+      </div>
+      <div style="flex:1 1 320px; min-width:260px;">
+        <p style="margin:0 0 2px 0; font-size:1em; color:#6b7280;">{name}</p>
+        <p style="margin:0 0 10px 0; font-size:1.8em; font-weight:700; color:{color}; line-height:1.15;">
+          {main}
+          <span style="color:#6b7280; font-weight:400; font-size:0.45em; display:block;">({result["latency_ms"]:.0f} ms)</span>
+          {f'<span style="font-size:0.5em; font-weight:600; display:block; margin-top:4px;">{sub}</span>' if sub else ''}
+        </p>
+        {_bars_html(result["probabilities"])}
+      </div>
     </div>
     """
 
@@ -160,29 +180,32 @@ def _grid_html(devices: dict) -> str:
     cards = []
     for name, device in sorted(devices.items()):
         result = device["result"]
-        color = "#d97706" if result["is_uncertain"] else "#15803d"
+        color, main, sub = _label_bits(result)
         safe_name = html.escape(name)
         if device.get("image") is None:
             thumb_html = (
-                '<div style="width:100%; aspect-ratio:4/3; border-radius:8px; '
+                '<div style="width:100%; height:100%; min-height:140px; border-radius:8px; '
                 'background:#f3f4f6; display:flex; align-items:center; justify-content:center; '
                 'color:#9ca3af; font-size:1.1em;">Waiting for a photo...</div>'
             )
         else:
             thumb = _data_uri(_downscale(device["image"], max_side=640))
-            thumb_html = f'<img src="{thumb}" style="width:100%; border-radius:8px;"/>'
+            thumb_html = f'<img src="{thumb}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:8px;"/>'
         cards.append(
             f"""
-            <div style="flex:1 1 46%; min-width:280px; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
-              {thumb_html}
+            <div style="flex:1 1 28%; min-width:240px; max-width:32%; max-height:46vh; display:flex; flex-direction:column; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
+              <div style="flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                {thumb_html}
+              </div>
               <p style="margin:8px 0 2px 0; font-size:1em; color:#6b7280; word-break:break-all;">{safe_name}</p>
               <p style="margin:0; font-weight:700; font-size:1.4em; color:{color};">
-                {result["label"]} &middot; {result["confidence"] * 100:.1f}%
+                {main}
               </p>
+              {f'<p style="margin:2px 0 0 0; font-weight:600; font-size:0.8em; color:{color};">{sub}</p>' if sub else ''}
             </div>
             """
         )
-    return f'<div style="display:flex; flex-wrap:wrap; gap:14px;">{"".join(cards)}</div>'
+    return f'<div style="display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start;">{"".join(cards)}</div>'
 
 
 def build_phone_tab(classifier) -> None:
@@ -198,26 +221,40 @@ def build_phone_tab(classifier) -> None:
     name_box = gr.Textbox(label="Your name", placeholder="e.g. Alex")
     join_btn = gr.Button("Start", variant="primary")
     name_state = gr.State("")
+    rear_camera = gr.WebcamOptions(constraints={"facingMode": {"ideal": "environment"}})
     cam = gr.Image(
         sources=["webcam"],
         streaming=True,
         type="pil",
         label="Point at an object (live stream)",
         visible=False,
+        webcam_options=rear_camera,
     )
+    with gr.Row(visible=False) as flash_row:
+        flash_btn = gr.Button("Flash: off", elem_id="flash-toggle-btn")
+        flash_status = gr.HTML(elem_id="flash-status")
     gr.Markdown(
         "If the live stream above doesn't start (common on some phone browsers "
         "through the proxy), use this instead:",
         visible=True,
     )
-    upload = gr.Image(sources=["upload", "webcam"], type="pil", label="Or take / upload a photo", visible=False)
-    send_btn = gr.Button("Send photo", visible=False)
+    upload = gr.Image(
+        sources=["upload", "webcam"],
+        type="pil",
+        label="Or take / upload a photo",
+        visible=False,
+        webcam_options=rear_camera,
+    )
+    send_btn = gr.Button("Send photo", variant="primary", visible=False)
     result_out = gr.HTML()
 
     def join(name):
         name = (name or "").strip()
         if not name:
-            return gr.update(), "", gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), ""
+            return (
+                gr.update(), "", gr.update(visible=False), gr.update(visible=False),
+                gr.update(visible=False), gr.update(visible=False), "",
+            )
         _register_join(name)
         _log(f"join: name={name!r}")
         return (
@@ -226,10 +263,48 @@ def build_phone_tab(classifier) -> None:
             gr.update(visible=True),
             gr.update(visible=True),
             gr.update(visible=True),
+            gr.update(visible=True),
             "",
         )
 
-    join_btn.click(join, inputs=name_box, outputs=[name_box, name_state, cam, upload, send_btn, result_out])
+    join_btn.click(
+        join,
+        inputs=name_box,
+        outputs=[name_box, name_state, cam, flash_row, upload, send_btn, result_out],
+    )
+
+    # Toggles the rear camera's torch directly via the page's MediaStreamTrack, entirely
+    # client-side (no round trip to the server). Finds the <video> element feeding the live
+    # stream, flips its track's torch constraint, and falls back to a status note when the
+    # browser/device doesn't expose torch control (common on iOS Safari).
+    flash_btn.click(
+        fn=None,
+        inputs=None,
+        outputs=None,
+        js="""
+        () => {
+            const statusEl = document.getElementById('flash-status');
+            const btn = document.getElementById('flash-toggle-btn');
+            const setStatus = (msg) => { if (statusEl) statusEl.innerHTML = msg ? `<p style="margin:4px 0;color:#6b7280;font-size:0.9em;">${msg}</p>` : ''; };
+            const video = Array.from(document.querySelectorAll('video')).find(v => v.srcObject && v.readyState >= 2);
+            if (!video) { setStatus('Start the camera first.'); return; }
+            const track = video.srcObject.getVideoTracks()[0];
+            if (!track) { setStatus('No camera track found.'); return; }
+            const caps = track.getCapabilities ? track.getCapabilities() : {};
+            if (!caps.torch) {
+                setStatus('Flash not supported on this phone; turn on a light.');
+                return;
+            }
+            const turningOn = !(btn && btn.textContent.includes('on'));
+            track.applyConstraints({ advanced: [{ torch: turningOn }] })
+                .then(() => {
+                    if (btn) btn.textContent = turningOn ? 'Flash: on' : 'Flash: off';
+                    setStatus('');
+                })
+                .catch(() => setStatus('Could not toggle flash on this phone.'));
+        }
+        """,
+    )
 
     def _classify_and_register(frame, name, label):
         if frame is None or not name:
