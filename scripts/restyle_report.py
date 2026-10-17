@@ -929,34 +929,43 @@ def restyle(in_path: Path, out_path: Path) -> None:
     sweep = load("threshold_sweep.json")
     selection = load("threshold_selection.json")
 
+    # Everything below goes at the end of the body but before w:sectPr, which
+    # must stay the last child.
+    section = body_el.find(qn("w:sectPr"))
+
+    def emit(element):
+        section.addprevious(element)
+        return element
+
     def appendix_heading(text, *, page_break):
         p = make_paragraph(doc, [text], align="left", before=240, after=120,
                            line=240, keep_next=True, keep_lines=True,
                            page_break=page_break)
         set_run_props(p, size=H2_SIZE, bold=False)
-        body_el.append(p._p)
+        emit(p._p)
         return p
 
     def appendix_body(text):
         p = body(doc, [text])
         set_run_props(p, size=BODY_SIZE)
-        body_el.append(p._p)
+        emit(p._p)
         return p
 
     def appendix_caption(text):
         p = caption(doc, text)
-        body_el.append(p._p)
+        emit(p._p)
         return p
 
     def appendix_figure(image_path: Path):
         p = Paragraph(el("w:p"), doc)
         p.add_run().add_picture(str(image_path), width=TEXT_WIDTH_EMU)
         set_ppr(p, align="center", before=120, after=60, keep_next=True)
-        body_el.append(p._p)
+        emit(p._p)
         return p
 
     def appendix_table(rows):
         table = doc.add_table(rows=len(rows), cols=len(rows[0]))
+        emit(table._tbl)
         for r, row in enumerate(rows):
             for c, value in enumerate(row):
                 cell = table.cell(r, c)
@@ -969,7 +978,7 @@ def restyle(in_path: Path, out_path: Path) -> None:
                               before=0, after=240, line=240, keep_next=True,
                               keep_lines=True, page_break=True)
         set_run_props(head, size=H1_SIZE, bold=True)
-        body_el.append(head._p)
+        emit(head._p)
 
         # Appendix A ---------------------------------------------------------
         appendix_heading("Appendix A. Threshold sweep and threshold selection", page_break=False)
@@ -1096,7 +1105,7 @@ def restyle(in_path: Path, out_path: Path) -> None:
                                left=720, hanging=360, num_id="1")
             p._p.append(plain_run(label, False))
             p._p.append(hyperlink_el(url, [(url, False)]))
-            body_el.append(p._p)
+            emit(p._p)
         appendix_body(
             "Inside the repository, the notebook is "
             "src/training/Midterm_Object_Sorting_RealWaste.ipynb, the trained model is "
