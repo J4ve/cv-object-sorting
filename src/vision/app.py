@@ -53,7 +53,7 @@ CLASS_COLORS = {
 }
 
 
-def _thumb_data_uri(image: Image.Image, max_side: int = 360) -> str:
+def _thumb_data_uri(image: Image.Image, max_side: int = 440) -> str:
     img = image.copy()
     img.thumbnail((max_side, max_side))
     buf = io.BytesIO()
@@ -73,8 +73,8 @@ def _bars_html(probabilities: dict, top_n: int = 3) -> str:
               <div style="display:flex; justify-content:space-between; font-size:1.05em;">
                 <span>{cls}</span><span>{pct:.1f}%</span>
               </div>
-              <div style="background:#e5e7eb; border-radius:6px; height:16px;">
-                <div style="background:#4c78a8; width:{pct:.1f}%; height:16px; border-radius:6px;"></div>
+              <div style="background:#e5e7eb; border-radius:8px; height:26px;">
+                <div style="background:#4c78a8; width:{pct:.1f}%; height:26px; border-radius:8px;"></div>
               </div>
             </div>
             """
@@ -89,15 +89,15 @@ def _card_html(image: Image.Image, title: str, result: dict | None, error: str |
     else:
         color = CLASS_COLORS.get(result["label"], "#334155")
         body = (
-            f'<p style="margin:4px 0; font-weight:800; font-size:2.6em; line-height:1.1; color:{color};">'
+            f'<p style="margin:4px 0; font-weight:800; font-size:3.4em; line-height:1.1; color:{color};">'
             f'{result["label"]} '
-            f'<span style="font-size:0.5em; font-weight:600; color:#374151;">{result["confidence"] * 100:.1f}%</span>'
-            f'<span style="font-size:0.32em; font-weight:400; color:#6b7280;"> ({result["latency_ms"]:.0f} ms)</span></p>'
+            f'<span style="font-size:0.45em; font-weight:600; color:#374151;">{result["confidence"] * 100:.1f}%</span>'
+            f'<span style="font-size:0.28em; font-weight:400; color:#6b7280;"> ({result["latency_ms"]:.0f} ms)</span></p>'
             f"{_bars_html(result['probabilities'])}"
         )
     return f"""
-    <div style="display:flex; gap:16px; border:1px solid #e5e7eb; border-radius:10px; padding:14px; margin-bottom:14px; align-items:flex-start;">
-      <img src="{thumb}" style="width:220px; height:220px; object-fit:cover; border-radius:8px; flex-shrink:0;"/>
+    <div style="display:flex; gap:20px; border:1px solid #e5e7eb; border-radius:12px; padding:18px; margin-bottom:18px; align-items:flex-start;">
+      <img src="{thumb}" style="width:280px; height:280px; object-fit:cover; border-radius:10px; flex-shrink:0;"/>
       <div style="flex:1; min-width:0;">
         <p style="margin:0 0 4px 0; font-size:0.85em; color:#6b7280; word-break:break-all;">{title}</p>
         {body}
@@ -158,8 +158,9 @@ def classify_stream(frame):
 
 
 SCREEN_SHARE_CSS = """
-.tab-nav button { font-size: 1.3em !important; font-weight: 700 !important; }
-body, .gradio-container { font-size: 1.3em; }
+.tab-nav button { font-size: 1.6em !important; font-weight: 700 !important; padding: 10px 18px !important; }
+body, .gradio-container { font-size: 1.45em; }
+h1 { font-size: 2.1em !important; }
 """
 
 with gr.Blocks(title="Waste Classifier (RealWaste, Midterm demo)", analytics_enabled=False) as demo:
