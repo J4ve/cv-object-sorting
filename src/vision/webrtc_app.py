@@ -14,6 +14,7 @@ automatically if a token is ever provided later).
 
 Run with: python src/vision/webrtc_app.py
 """
+import logging
 import os
 import sys
 import threading
@@ -23,6 +24,9 @@ from collections import deque
 from pathlib import Path
 
 os.environ.setdefault("GRADIO_ANALYTICS_ENABLED", "False")
+logging.basicConfig(level=logging.INFO)
+if os.environ.get("WEBRTC_DEBUG"):
+    logging.getLogger("fastrtc").setLevel(logging.DEBUG)
 
 import gradio as gr
 import numpy as np
