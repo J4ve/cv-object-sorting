@@ -28,6 +28,25 @@ Limitations) and 9.2 (Recommendations).
 No em dashes in any prose (README files, report text, this file). Use a period, comma, colon,
 or parentheses instead. US English spelling.
 
+## FastRTC (experimental WebRTC demo, src/vision/webrtc_app.py)
+
+- `fastrtc` pins `gradio<6.0`; it cannot share a venv with `app.py`'s `gradio==6.30.0`.
+  Pin `tensorflow`/`numpy` to the versions in `requirements.txt` when installing fastrtc so
+  pip resolves a compatible `gradio` (5.50.0 as of this writing) without re-downloading TF.
+- The `WebRTC` gradio component's `VideoCallback.recv()` blocks forever on
+  `wait_for_channel()` until the client opens an `RTCDataChannel`. FastRTC's own JS frontend
+  always does this; a raw client (e.g. `aiortc` for headless testing, see
+  `scripts/webrtc_client_test.py`) must call `pc.createDataChannel(...)` before `createOffer()`
+  or no video frame is ever processed.
+- Signaling for the gradio `WebRTC` component goes through gradio's generic
+  `/gradio_api/component_server` RPC (`fn_name: "offer"`), not a dedicated `/webrtc/offer`
+  route; that route only exists when using `fastrtc.Stream.mount()` directly, not inside
+  `gr.Blocks`.
+- A VPS `caddy reload` is not disruption-free: it briefly cuts long-held
+  `/gradio_api/stream/...` long-polls (observed ~10-15s of 502s on the primary demo during an
+  unrelated reload). Gradio's client reconnects on its own, but avoid reloading Caddy while a
+  real demo session may be live.
+
 ## Maintaining this file
 
 Keep this file for knowledge useful to almost every future agent session in this project.

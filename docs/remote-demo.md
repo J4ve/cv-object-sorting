@@ -109,6 +109,33 @@ stays responsive instead of building up a backlog under load.
   VPS side, never to all interfaces, so it could not be reached except
   through Caddy's HTTPS proxy.
 
+## Experimental: a real-time WebRTC version
+
+Alongside the JPEG-frame approach above, there is an experimental version at
+`src/vision/webrtc_app.py` that streams phone video over **WebRTC**
+(using the FastRTC library) instead of individual uploaded frames, aiming
+for smoother live video for the Presenter view during screen-share. It is
+not the primary demo; it was only switched to if it proved reliable on
+real phones.
+
+It reuses the same reverse-SSH-tunnel-plus-Caddy pattern described above,
+on its own separate port and hostname, so it never competes with or
+disturbs the primary demo's tunnel or Caddy site block.
+
+WebRTC needs to negotiate a peer-to-peer (or relayed) connection between
+each phone and the presenter's desktop, which plain HTTPS reverse-proxying
+does not handle by itself:
+
+- A public **STUN** server (`stun:stun.l.google.com:19302`) is tried first,
+  which is enough when at least one side has a normal, non-restrictive
+  network path.
+- Phones and home networks behind strict NAT or carrier-grade NAT may still
+  fail to connect over STUN alone; a **TURN** relay would be needed for
+  those cases. This demo reads an optional environment variable for a
+  free TURN credential helper, used only if one is ever configured; with
+  none set, it falls back to STUN only, and simply shows a message
+  pointing back at the primary demo link if a phone can't connect.
+
 ## Troubleshooting notes (for next time)
 
 - **502 Bad Gateway** from the hostname means Caddy can reach the VPS but
