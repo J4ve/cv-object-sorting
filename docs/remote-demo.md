@@ -6,9 +6,11 @@ Meet, while groupmates join from their own homes and use their **phones**
 as the camera source. Each groupmate points their phone at a different
 everyday object, which gave the demo varied real-world viewpoints,
 backgrounds, and lighting without anyone needing to bring physical props
-to one location. The presenter just switches the active camera from a
-dropdown in the Gradio UI to flip between phones live, on screen, for
-everyone on the call.
+to one location. Each groupmate opens the app's **Phone camera** tab and
+enters their name once; the presenter switches between them from a
+device dropdown in the app's **Presenter** tab (see
+[`src/vision/README.md`](../src/vision/README.md)) to flip between phones
+live, on screen, for everyone on the call.
 
 This is a description of how that one session was run, not a plan for
 permanent infrastructure — there's no dedicated hardware or server for
