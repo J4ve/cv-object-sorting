@@ -39,12 +39,14 @@ class WasteClassifier:
             )
         self.model = tf.keras.models.load_model(model_path)
         self.class_names = json.load(open(class_names_path))
+        self._infer = tf.function(lambda x: self.model(x, training=False))
         self._warm_up()
 
     def _warm_up(self):
-        """Runs one dummy inference so the first real prediction isn't slowed by lazy init."""
+        """Runs one dummy inference so the first real prediction isn't slowed by lazy init
+        or by tf.function's one-time tracing/compilation cost."""
         dummy = np.zeros((1, *IMG_SIZE, 3), dtype=np.float32)
-        self.model(dummy, training=False)
+        self._infer(dummy)
 
     def preprocess(self, image: Image.Image) -> np.ndarray:
         """Converts any PIL image to the raw 0-255 RGB array the model expects."""
@@ -58,7 +60,7 @@ class WasteClassifier:
         latency in ms, and whether confidence cleared CONF_THRESH ('Uncertain' otherwise)."""
         t0 = time.perf_counter()
         x = self.preprocess(image)
-        probs = self.model(x[None, ...], training=False).numpy()[0]
+        probs = self._infer(x[None, ...]).numpy()[0]
         latency_ms = (time.perf_counter() - t0) * 1000
         idx = int(probs.argmax())
         conf = float(probs[idx])
