@@ -71,7 +71,7 @@ FIGURE_SIZES = {
     2: (4.4, 2.5),    # dataset distribution chart
     3: (3.4, 2.9),    # class sample grid
     5: (6.3, 2.2),    # training curves
-    6: (5.9, 2.4),    # test-set confusion matrix
+    6: (6.5, 2.6),    # test-set confusion matrix
     7: (4.5, 4.2),    # ROC curves
     8: (3.0, 3.0),    # threshold sweep, placed beside Figure 9
     9: (3.0, 3.0),    # threshold selection

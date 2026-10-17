@@ -60,8 +60,18 @@ or parentheses instead. US English spelling.
   silently do nothing.
 - Every figure that carries data must come from an executed notebook cell (captain rule).
   The dataset distribution chart is a Step 3 cell of
-  `src/training/Midterm_Object_Sorting_RealWaste.ipynb`; only the architecture block
-  diagram is drawn outside it, by `docs/images/make_architecture_figure.py`.
+  `src/training/Midterm_Object_Sorting_RealWaste.ipynb`, and
+  `results/training_curves_colab_run.png` is the image output of the training-curves cell
+  of the group's original Colab notebook, decoded unaltered; only the architecture block
+  diagram is drawn outside a notebook, by `docs/images/make_architecture_figure.py`.
+- Page fill is a graded criterion: the reference reports fill every page to 80 to 95%, with
+  only the last page partial. The script keeps a page break after the cover and before
+  REFERENCES and nowhere else, caps each figure in `FIGURE_SIZES`, sets body text to 1.15
+  line spacing, keeps figure-to-caption but not caption-to-explanation, and lets a table
+  over six rows break with its header repeated. Changing a figure's size moves every page
+  after it, so re-measure before and after: render each page with `pdftoppm -r 40 -gray`
+  and find the last row holding ink. Fix the earliest short page first; a short page is
+  caused by whatever unit starts the next one.
 - OOXML gotchas this document hit: `w:ind` values are twips, while python-docx reports them
   as EMU, so reading a value and writing it back silently indents by inches; the Google Docs
   export carried an invalid non-integer `w:line` spacing value, which is what made the first
