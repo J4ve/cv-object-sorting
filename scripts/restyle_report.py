@@ -776,11 +776,11 @@ def restyle(in_path: Path, out_path: Path) -> None:
     # -- 13. appendix pointers in the body ----------------------------------
     pointers = [
         ("The live demonstration extends Part A with remote camera input",
-         " A full-page version of Figure 1 is in Appendix E."),
+         " Figure 1 is repeated on a page of its own in Appendix E."),
         ("Most common mistakes (true class misread as predicted class",
-         " A full-page version of this confusion matrix is in Appendix B."),
+         " This confusion matrix is repeated on a page of its own in Appendix B."),
         ("The drop from 87.93% to 56.00% is domain shift",
-         " A full-page version of this confusion matrix is in Appendix C."),
+         " This confusion matrix is repeated on a page of its own in Appendix C."),
     ]
     for prefix, extra in pointers:
         p = find_paragraph(all_paragraphs(), lambda t, pre=prefix: t.strip().startswith(pre))
@@ -1048,8 +1048,8 @@ def restyle(in_path: Path, out_path: Path) -> None:
         appendix_heading("Appendix B. Confusion matrix on the RealWaste test set",
                          page_break=True)
         appendix_figure(ROOT / "results" / "confusion_matrix.png")
-        appendix_caption("Figure 12. Full-page version of Figure 5: the confusion matrix on "
-                         "the 464-image test set (counts, left; row-normalized, right).")
+        appendix_caption("Figure 12. The confusion matrix on the 464-image test set, repeated "
+                         "from Figure 5 (counts, left; row-normalized, right).")
         appendix_body(
             "The diagonal holds the correct predictions. The off-diagonal cells show that "
             "the mistakes cluster on visually similar materials rather than spreading "
@@ -1061,8 +1061,8 @@ def restyle(in_path: Path, out_path: Path) -> None:
         appendix_heading("Appendix C. Confusion matrix on the unseen TrashNet test set",
                          page_break=True)
         appendix_figure(ROOT / "results" / "unseen_trashnet_confusion_matrix.png")
-        appendix_caption("Figure 13. Full-page version of Figure 10: the confusion matrix on "
-                         "the 500-image unseen TrashNet test set.")
+        appendix_caption("Figure 13. The confusion matrix on the 500-image unseen TrashNet "
+                         "test set, repeated from Figure 10.")
         appendix_body(
             "The error pattern is different from the one in Appendix B. On images from "
             "outside RealWaste the model falls back on Cardboard for every class, most "
@@ -1093,8 +1093,9 @@ def restyle(in_path: Path, out_path: Path) -> None:
         # Appendix E ---------------------------------------------------------
         appendix_heading("Appendix E. System architecture diagram", page_break=True)
         appendix_figure(ROOT / "docs" / "images" / "system-architecture.png")
-        appendix_caption("Figure 16. Full-page version of Figure 1: the recognition pipeline, "
-                         "the live demonstration path, and the offline training pipeline.")
+        appendix_caption("Figure 16. The system architecture, repeated from Figure 1: the "
+                         "recognition pipeline, the live demonstration path, and the "
+                         "offline training pipeline.")
         appendix_body(
             "Part A is what happens to one image at demonstration time and Part B is the "
             "offline run that produced the model it uses. Every step of Part A runs on the "
